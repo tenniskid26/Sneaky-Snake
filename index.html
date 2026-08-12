@@ -20,6 +20,12 @@
     --green-dark: #708C4B;
     --gold: #D9A441;
     --gold-dark: #B9852A;
+    --safe-color: #7FD1E0;
+    --safe-color-dark: #4FB3C7;
+    --pileA-color: #4CAF50;
+    --pileA-color-dark: #388E3C;
+    --pileB-color: #F5D033;
+    --pileB-color-dark: #D9AE0E;
   }
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:'Baloo 2', sans-serif; }
@@ -57,6 +63,8 @@
   .count-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
   .count-btn { width:44px; height:44px; border-radius:50%; border:2px solid var(--ink); background:var(--pink); font-weight:700; cursor:pointer; }
   .count-btn.active { background:var(--purple); color:#fff; }
+  .board-size-btn { padding:10px 16px; border-radius:12px; border:2px solid var(--ink); background:var(--pink); font-weight:700; cursor:pointer; font-family:'Baloo 2', sans-serif; font-size:0.95rem; }
+  .board-size-btn.active { background:var(--purple); color:#fff; }
 
   .name-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
   .token-dot { width:20px; height:20px; border-radius:50%; border:2px solid var(--ink); flex-shrink:0; }
@@ -182,8 +190,8 @@
   .modal.help-modal p { margin: 4px 0; line-height:1.4; font-size:0.95rem; }
 
   .pile-tag { display:inline-block; font-family:'Patrick Hand', cursive; font-size:1rem; padding:3px 14px; border-radius:20px; border:2px solid var(--ink); margin-bottom:14px; }
-  .pile-tag.A { background:var(--purple); color:#fff; }
-  .pile-tag.B { background:var(--green); }
+  .pile-tag.A { background:var(--pileA-color); color:#fff; }
+  .pile-tag.B { background:var(--pileB-color); color:var(--ink); }
   .modal .card-text { font-family:'Patrick Hand', cursive; font-size:1.55rem; margin:8px 0 20px; }
 
   .swap-list { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
@@ -224,6 +232,9 @@
     <label class="field-label">How many players?</label>
     <div class="count-row" id="countRow"></div>
 
+    <label class="field-label">Board size</label>
+    <div class="count-row" id="boardSizeRow"></div>
+
     <label class="field-label">Players</label>
     <div id="nameFields"></div>
 
@@ -238,6 +249,9 @@
 
     <label class="field-label">How many bot opponents?</label>
     <div class="count-row" id="botCountRow"></div>
+
+    <label class="field-label">Board size</label>
+    <div class="count-row" id="botBoardSizeRow"></div>
 
     <button class="big-btn" id="startBotBtn">Let's Play</button>
     <button class="big-btn secondary" id="backFromBotBtn">Back</button>
@@ -266,6 +280,9 @@
     <label class="field-label">Players joined</label>
     <div class="joined-list" id="joinedList"></div>
 
+    <label class="field-label">Board size</label>
+    <div class="count-row" id="lobbyBoardSizeRow"></div>
+
     <div id="joinFormArea">
       <input class="name-input" id="lobbyNameInput" placeholder="Your name" maxlength="16" style="margin-bottom:10px;">
       <button class="big-btn" id="lobbyJoinBtn">Join Game</button>
@@ -281,9 +298,15 @@
     <div class="status-bar">
       <div class="turn-label">Turn: <span id="turnName">-</span></div>
       <div class="status-actions">
+        <button class="icon-btn" id="muteBtn" title="Toggle sound">🔊</button>
         <button class="icon-btn help-trigger" title="How to play">?</button>
         <button class="icon-btn" id="quitBtn" title="Quit to home">🏠</button>
       </div>
+    </div>
+
+    <div class="controls">
+      <div class="die" id="dieFace">🎲</div>
+      <button class="roll-btn" id="rollBtn">Roll the Die</button>
     </div>
 
     <div class="prompt-bar">
@@ -296,18 +319,18 @@
     <div class="piles-row">
       <div class="pile-stack" id="pileAWrap">
         <div class="pile-cards" id="pileAStack">
-          <div class="pile-card" style="background:var(--purple); top:6px; left:4px;"></div>
-          <div class="pile-card" style="background:var(--purple); top:3px; left:2px;"></div>
-          <div class="pile-card" style="background:var(--purple); top:0; left:0;"></div>
+          <div class="pile-card" style="background:var(--pileA-color); top:6px; left:4px;"></div>
+          <div class="pile-card" style="background:var(--pileA-color); top:3px; left:2px;"></div>
+          <div class="pile-card" style="background:var(--pileA-color); top:0; left:0;"></div>
         </div>
         <div class="pile-label">Pile A</div>
         <div class="pile-hint" id="pileAHint"></div>
       </div>
       <div class="pile-stack" id="pileBWrap">
         <div class="pile-cards" id="pileBStack">
-          <div class="pile-card" style="background:var(--green); top:6px; left:4px;"></div>
-          <div class="pile-card" style="background:var(--green); top:3px; left:2px;"></div>
-          <div class="pile-card" style="background:var(--green); top:0; left:0;"></div>
+          <div class="pile-card" style="background:var(--pileB-color); top:6px; left:4px;"></div>
+          <div class="pile-card" style="background:var(--pileB-color); top:3px; left:2px;"></div>
+          <div class="pile-card" style="background:var(--pileB-color); top:0; left:0;"></div>
         </div>
         <div class="pile-label">Pile B</div>
         <div class="pile-hint" id="pileBHint"></div>
@@ -317,16 +340,11 @@
     <div class="board-wrap">
       <div class="board-inner" id="boardInner"></div>
       <div class="legend">
-        <div class="legend-item"><div class="legend-swatch" style="background:var(--pink)"></div>Safe</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:var(--purple)"></div>Draw Pile A</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:var(--green)"></div>Draw Pile B</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--safe-color)"></div>Safe</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--pileA-color)"></div>Draw Pile A</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--pileB-color)"></div>Draw Pile B</div>
         <div class="legend-item"><div class="legend-swatch" style="background:var(--gold)"></div>Finish</div>
       </div>
-    </div>
-
-    <div class="controls">
-      <div class="die" id="dieFace">🎲</div>
-      <button class="roll-btn" id="rollBtn">Roll the Die</button>
     </div>
 
     <div class="log-panel" id="logPanel"></div>
@@ -347,24 +365,28 @@
 <div class="overlay hidden" id="winOverlay">
   <div class="modal winner-modal">
     <div class="card-text" id="winText">🎉 Winner! 🎉</div>
-    <button class="big-btn" id="playAgainBtn">Play Again</button>
+    <button class="big-btn" id="playAgainBtn">Return to Home</button>
   </div>
 </div>
 
 <div class="overlay hidden" id="helpOverlay">
   <div class="modal help-modal">
     <h3>How to play Sneaky Snake</h3>
-    <p>Tap "Roll the Die" to move that many squares along the snake.</p>
-    <h3>🩷 Safe squares</h3>
-    <p>Nothing happens — your turn ends.</p>
-    <h3>💜 Purple &amp; 💚 Green squares</h3>
-    <p>Tap the matching draw pile to pull a card, then tap "Do it!" to carry out what it says. If that lands you on another purple or green square, tap that pile again! Your turn only ends when you land on a safe square, or a "stay where you are" card comes up.</p>
+    <p>Tap "Roll the Die" to move that many squares along the snake. Every square is numbered so you can always see exactly where you are.</p>
+    <h3>🩵 Light blue squares</h3>
+    <p>Safe! Nothing happens — your turn ends.</p>
+    <h3>💚 Green &amp; 💛 Yellow squares</h3>
+    <p>Tap the matching draw pile to pull a card, then tap "Do it!" to carry out what it says. If that lands you on another green or yellow square, tap that pile again! Your turn only ends when you land on a light blue square, or a "stay where you are" card comes up. Your very first card of the game is never a "move backward" card, so no one gets unlucky right out of the gate.</p>
     <h3>🏁 Winning</h3>
     <p>You must land exactly on the END square (the snake's head) to win. If your move would take you past it, you don't move that turn.</p>
-    <h3>🤖 Computer players</h3>
-    <p>In local mode, any player marked AI plays automatically.</p>
+    <h3>📏 Board size</h3>
+    <p>Before starting, pick a Standard board (80 squares) or a Short board (50 squares) — either way you get a freshly shuffled layout and card piles each game.</p>
+    <h3>🤖 Playing with bots</h3>
+    <p>Choose "Play with Bots" from the home screen to play solo against one or more computer opponents — they roll, draw cards, and move automatically.</p>
     <h3>🌐 Online mode</h3>
     <p>Each player joins from their own device with a room code. Only the current player's device is interactive — everyone else just watches until it's their turn.</p>
+    <h3>🔊 Sound</h3>
+    <p>Tap the speaker icon during a game to mute or unmute the music and sound effects.</p>
     <h3>🏠 Quitting</h3>
     <p>Tap the house icon any time to end the game and go back to setup.</p>
     <button class="big-btn" id="helpOkBtn">Got it</button>
@@ -387,13 +409,13 @@
 
   // ---------- Config ----------
   const COLS = 10;
-  const ROWS = 8;
-  const BOARD_LENGTH = COLS * ROWS; // 80
-  const FINISH_INDEX = BOARD_LENGTH - 1;
-  const TOKEN_COLORS = ["#C0554A","#4472A8","#D9A441","#5E9E63","#8B5FBF","#D9678C","#3F8F8C","#B77B2E"];
+  let ROWS = 8;
+  let BOARD_LENGTH = COLS * ROWS; // 80
+  let FINISH_INDEX = BOARD_LENGTH - 1;
+  const TOKEN_COLORS = ["#E8384F","#1E88E5","#FFC400","#2ECC71","#9B59B6","#FF4FA3","#17C3B2","#FF8C1A"];
   const STEP_MS = 150;
 
-  const COLOR_HEX = { safe:"#F3BFCB", A:"#7A3B63", B:"#8FAE64", gold:"#D9A441", ink:"#2B2320" };
+  const COLOR_HEX = { safe:"#7FD1E0", A:"#4CAF50", B:"#F5D033", gold:"#D9A441", ink:"#2B2320" };
 
   // ---------- Layout geometry for the SVG snake ----------
   const cellLen = 58;
@@ -405,7 +427,16 @@
   const topMargin = 10;
   const L = COLS * cellLen;
   const svgWidth = L + marginX * 2;
-  const svgHeight = topMargin * 2 + (ROWS - 1) * P + trackWidth;
+  let svgHeight = topMargin * 2 + (ROWS - 1) * P + trackWidth;
+
+  // Recomputes all board-size-dependent geometry. rows=8 -> 80 squares
+  // (standard), rows=5 -> 50 squares (short board).
+  function configureBoardSize(rows){
+    ROWS = rows;
+    BOARD_LENGTH = COLS * ROWS;
+    FINISH_INDEX = BOARD_LENGTH - 1;
+    svgHeight = topMargin * 2 + (ROWS - 1) * P + trackWidth;
+  }
 
   const PILE_A = [
     {type:"forward", value:3, text:"Move forward 3"},
@@ -433,6 +464,21 @@
     for(let i = copy.length - 1; i > 0; i--){
       const j = Math.floor(Math.random() * (i + 1));
       [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  // Shuffle a fresh pile, but guarantee the very first card drawn from it
+  // is never a "backward" card — bad luck on turn one feels unfair.
+  function freshShuffledPile(pile){
+    const copy = shuffledPile(pile);
+    if(copy[0] && copy[0].type === "backward"){
+      const swapIdx = copy.findIndex(c => c.type !== "backward");
+      if(swapIdx > 0){
+        const tmp = copy[0];
+        copy[0] = copy[swapIdx];
+        copy[swapIdx] = tmp;
+      }
     }
     return copy;
   }
@@ -529,6 +575,117 @@
   } catch(e){ fbOk = false; }
 
   function storageOk(){ return fbOk; }
+
+  // ================= SOUND (synthesized — no external audio files) =================
+  let audioCtx = null;
+  let musicMuted = false;
+  let musicTimer = null;
+  let musicStep = 0;
+
+  function ensureAudioCtx(){
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ audioCtx = null; }
+    }
+    if(audioCtx && audioCtx.state === "suspended"){ audioCtx.resume(); }
+    return audioCtx;
+  }
+
+  function tone(freq, startOffset, duration, opts){
+    const ctx = ensureAudioCtx();
+    if(!ctx || musicMuted) return;
+    opts = opts || {};
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = opts.type || "sine";
+    const t0 = ctx.currentTime + (startOffset || 0);
+    osc.frequency.setValueAtTime(freq, t0);
+    if(opts.slideTo){
+      osc.frequency.exponentialRampToValueAtTime(Math.max(opts.slideTo, 1), t0 + duration);
+    }
+    const peak = opts.gain != null ? opts.gain : 0.12;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(0.03, duration/4));
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.05);
+  }
+
+  function playClickSound(){ tone(700, 0, 0.07, {type:"square", gain:0.05}); }
+
+  function playDiceSound(){
+    for(let i=0;i<4;i++){
+      tone(280 + Math.random()*260, i*0.06, 0.05, {type:"square", gain:0.06});
+    }
+  }
+
+  function playForwardSound(){
+    // Cheerful ascending chime + a little sparkle — our "applause" for good news
+    [523.25,659.25,783.99,1046.5].forEach((f,i)=> tone(f, i*0.07, 0.18, {type:"triangle", gain:0.10}));
+    for(let i=0;i<10;i++){
+      tone(1800 + Math.random()*1400, 0.24 + Math.random()*0.18, 0.05, {type:"square", gain:0.02});
+    }
+  }
+
+  function playBackwardSound(){
+    // Classic descending "wah-wah-wah-waaah" sad trombone
+    const notes = [ [392,330], [349,294], [330,262], [294,196] ];
+    notes.forEach(([from,to], i) => {
+      tone(from, i*0.32, 0.3, {type:"sawtooth", gain:0.09, slideTo:to});
+    });
+  }
+
+  function playStaySound(){
+    tone(440, 0, 0.14, {type:"sine", gain:0.08});
+    tone(392, 0.12, 0.18, {type:"sine", gain:0.08});
+  }
+
+  function playWinSound(){
+    [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=> tone(f, i*0.12, 0.35, {type:"triangle", gain:0.12}));
+  }
+
+  // Gentle looping background melody, low volume, runs while the tab is open
+  const MUSIC_NOTES = [392,440,523.25,440,392,349.23,392,523.25,587.33,523.25,440,392];
+  function scheduleMusicStep(){
+    if(!musicMuted){
+      const freq = MUSIC_NOTES[musicStep % MUSIC_NOTES.length];
+      tone(freq, 0, 0.5, {type:"sine", gain:0.045});
+      musicStep++;
+    }
+    musicTimer = setTimeout(scheduleMusicStep, 420);
+  }
+  function startBackgroundMusic(){
+    if(musicTimer) return;
+    ensureAudioCtx();
+    scheduleMusicStep();
+  }
+
+  function updateMuteBtn(){
+    const btn = document.getElementById("muteBtn");
+    if(btn) btn.textContent = musicMuted ? "🔇" : "🔊";
+  }
+  document.addEventListener("click", (e) => {
+    if(e.target.closest && e.target.closest("#muteBtn")){
+      musicMuted = !musicMuted;
+      updateMuteBtn();
+    }
+  });
+
+  // Start audio + music on the very first click anywhere (browsers block audio
+  // until a user gesture), and give every button a soft click sound.
+  let audioStarted = false;
+  document.addEventListener("click", (e) => {
+    if(!audioStarted){
+      audioStarted = true;
+      ensureAudioCtx();
+      startBackgroundMusic();
+    }
+    const btn = e.target.closest && e.target.closest("button");
+    if(btn && btn.id !== "muteBtn"){
+      playClickSound();
+    }
+  }, true);
   function roomRef(code){ return fbDb.ref("rooms/" + code); }
 
   // ================= MODE SELECT =================
@@ -565,9 +722,32 @@
   });
   document.getElementById("backFromConnectBtn").addEventListener("click", () => showOnly(modeScreen));
 
+  // ================= Board size selector (shared helper) =================
+  function renderBoardSizeRow(containerId, initialRows, onChange){
+    const row = document.getElementById(containerId);
+    let current = initialRows;
+    const options = [ { label:"Standard (80)", rows:8 }, { label:"Short (50)", rows:5 } ];
+    options.forEach(opt => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "board-size-btn" + (opt.rows === current ? " active" : "");
+      b.textContent = opt.label;
+      b.addEventListener("click", () => {
+        current = opt.rows;
+        [...row.children].forEach(c => c.classList.remove("active"));
+        b.classList.add("active");
+        onChange(current);
+      });
+      row.appendChild(b);
+    });
+    return { get: () => current };
+  }
+
   // ================= LOCAL SETUP =================
   const countRow = document.getElementById("countRow");
   const nameFields = document.getElementById("nameFields");
+  let localBoardRows = 8;
+  renderBoardSizeRow("boardSizeRow", 8, (rows) => { localBoardRows = rows; });
   for(let n=2; n<=8; n++){
     const b = document.createElement("button");
     b.className = "count-btn" + (n===numPlayers ? " active" : "");
@@ -616,9 +796,10 @@
         isAI: false
       });
     }
+    configureBoardSize(localBoardRows);
     BOARD = buildRandomBoard();
-    pileA = shuffledPile(PILE_A);
-    pileB = shuffledPile(PILE_B);
+    pileA = freshShuffledPile(PILE_A);
+    pileB = freshShuffledPile(PILE_B);
     currentIdx = 0;
     gameOver = false;
     showOnly(gameScreen);
@@ -633,6 +814,8 @@
   // ================= BOT SETUP =================
   const botCountRow = document.getElementById("botCountRow");
   let botCount = 1;
+  let botBoardRows = 8;
+  renderBoardSizeRow("botBoardSizeRow", 8, (rows) => { botBoardRows = rows; });
   for(let n=1; n<=7; n++){
     const b = document.createElement("button");
     b.className = "count-btn" + (n===botCount ? " active" : "");
@@ -652,9 +835,10 @@
     for(let i=0;i<botCount;i++){
       players.push({ name: "Computer " + (i+1), pos: 0, color: TOKEN_COLORS[i+1], isAI: true });
     }
+    configureBoardSize(botBoardRows);
     BOARD = buildRandomBoard();
-    pileA = shuffledPile(PILE_A);
-    pileB = shuffledPile(PILE_B);
+    pileA = freshShuffledPile(PILE_A);
+    pileB = freshShuffledPile(PILE_B);
     currentIdx = 0;
     gameOver = false;
     showOnly(gameScreen);
@@ -743,6 +927,9 @@
     }
   }
 
+  let lobbyBoardRows = 8;
+  renderBoardSizeRow("lobbyBoardSizeRow", 8, (rows) => { lobbyBoardRows = rows; });
+
   document.getElementById("lobbyJoinBtn").addEventListener("click", async () => {
     const name = document.getElementById("lobbyNameInput").value.trim();
     const lobbyError = document.getElementById("lobbyError");
@@ -781,12 +968,13 @@
       // exact moment the host hits Start, a plain get()+set() could start
       // the game against a players list that's already stale, silently
       // dropping that joiner (and leaving their device stuck waiting).
-      const board = buildRandomBoard();
-      const freshPileA = shuffledPile(PILE_A);
-      const freshPileB = shuffledPile(PILE_B);
+      const board = (() => { configureBoardSize(lobbyBoardRows); return buildRandomBoard(); })();
+      const freshPileA = freshShuffledPile(PILE_A);
+      const freshPileB = freshShuffledPile(PILE_B);
       await roomRef(roomCode).transaction(state => {
         if(!state || !state.players || state.players.length < 2 || state.started) return;
         state.board = board;
+        state.rows = lobbyBoardRows;
         state.pileAOrder = encodePile(freshPileA, PILE_A);
         state.pileBOrder = encodePile(freshPileB, PILE_B);
         state.players = state.players.map(p => ({ name:p.name, color:p.color, pos:0 }));
@@ -809,6 +997,7 @@
 
   function beginOnlineGameFromState(state){
     isOnlineMode = true;
+    configureBoardSize(state.board ? Math.round(state.board.length / COLS) : 8);
     BOARD = state.board;
     pileA = decodePile(state.pileAOrder, PILE_A);
     pileB = decodePile(state.pileBOrder, PILE_B);
@@ -929,6 +1118,7 @@
       const rx = x - cellLen/2, ry = y - trackWidth/2;
       const fill = COLOR_HEX[BOARD[i]] || COLOR_HEX.safe;
       svg += `<rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${cellLen}" height="${trackWidth}" fill="${fill}" stroke="${COLOR_HEX.ink}" stroke-width="2"/>`;
+      svg += `<text x="${(rx+7).toFixed(1)}" y="${(ry+14).toFixed(1)}" font-family="Baloo 2, sans-serif" font-weight="800" font-size="11" fill="${COLOR_HEX.ink}" opacity="0.55">${i+1}</text>`;
     }
 
     const startC = cellCenter(0);
@@ -954,7 +1144,7 @@
     svg += `<line x1="${stemTipX}" y1="${finC.y}" x2="${prongTipX}" y2="${finC.y - prongSpread}" stroke="#D6453A" stroke-width="2.4" stroke-linecap="round"/>`;
     svg += `<line x1="${stemTipX}" y1="${finC.y}" x2="${prongTipX}" y2="${finC.y + prongSpread}" stroke="#D6453A" stroke-width="2.4" stroke-linecap="round"/>`;
 
-    svg += `<text x="${finC.x}" y="${finC.y + headH/2 + 13}" font-family="Patrick Hand, cursive" font-size="12" text-anchor="middle" fill="${COLOR_HEX.ink}" opacity="0.7">END</text>`;
+    svg += `<text x="${finC.x}" y="${finC.y + headH/2 + 13}" font-family="Patrick Hand, cursive" font-size="12" text-anchor="middle" fill="${COLOR_HEX.ink}" opacity="0.7">END &middot; ${FINISH_INDEX+1}</text>`;
 
     svg += `<g id="tokensLayer"></g>`;
     svg += `</svg>`;
@@ -976,12 +1166,12 @@
       const { x, y } = cellCenter(Number(posKey));
       const n = group.length;
       group.forEach((entry, k) => {
-        const offsetX = (k - (n-1)/2) * 12;
+        const offsetX = (k - (n-1)/2) * 16;
         const px = x + offsetX;
         const py = y - 2;
         inner += `<g>
-          <circle cx="${px}" cy="${py - 8}" r="5" fill="${entry.p.color}" stroke="${COLOR_HEX.ink}" stroke-width="1.4"/>
-          <rect x="${px-4}" y="${py-4}" width="8" height="9" rx="3" fill="${entry.p.color}" stroke="${COLOR_HEX.ink}" stroke-width="1.4"/>
+          <circle cx="${px}" cy="${py - 11}" r="7.5" fill="${entry.p.color}" stroke="${COLOR_HEX.ink}" stroke-width="1.8"/>
+          <rect x="${px-6}" y="${py-6}" width="12" height="13" rx="4" fill="${entry.p.color}" stroke="${COLOR_HEX.ink}" stroke-width="1.8"/>
         </g>`;
       });
     });
@@ -1150,6 +1340,7 @@
 
   async function performRoll(playerIdx){
     rollBtn.disabled = true;
+    playDiceSound();
     const roll = 1 + Math.floor(Math.random()*6);
     dieFace.textContent = roll;
     logMsg(`${players[playerIdx].name} rolled a ${roll}.`);
@@ -1209,7 +1400,7 @@
 
     const pile = color === "A" ? pileA : pileB;
     const stackEl = color === "A" ? pileAStackEl : pileBStackEl;
-    const bg = color === "A" ? "var(--purple)" : "var(--green)";
+    const bg = color === "A" ? "var(--pileA-color)" : "var(--pileB-color)";
     const card = pile.shift();
     pile.push(card);
 
@@ -1250,17 +1441,20 @@
   async function applyCard(card, playerIdx){
     const player = players[playerIdx];
     if(card.type === "stay"){
+      playStaySound();
       logMsg(`${player.name} stays put.`);
       await endTurnFlow(playerIdx);
       return;
     }
     if(card.type === "forward"){
+      playForwardSound();
       logMsg(`${player.name} moves forward ${card.value}.`);
       setPrompt(`${player.name} moves forward ${card.value}...`);
       await movePlayer(playerIdx, card.value);
       return;
     }
     if(card.type === "backward"){
+      playBackwardSound();
       logMsg(`${player.name} moves backward ${card.value}.`);
       setPrompt(`${player.name} moves backward ${card.value}...`);
       await movePlayer(playerIdx, -card.value);
@@ -1351,6 +1545,7 @@
 
   function finishGame(playerIdx){
     gameOver = true;
+    playWinSound();
     renderStatus();
     setPrompt(`${players[playerIdx].name} wins!`);
     winText.textContent = `🎉 ${players[playerIdx].name} wins! 🎉`;
