@@ -12,10 +12,10 @@
   :root{
     --paper: #F4EEDC;
     --ink: #2B2320;
-    --pink: #F3BFCB;
-    --pink-dark: #E497AA;
-    --purple: #7A3B63;
-    --purple-dark: #5C2A49;
+    --pink: #F5D033;
+    --pink-dark: #D9AE0E;
+    --purple: #4CAF50;
+    --purple-dark: #2E7D32;
     --green: #8FAE64;
     --green-dark: #708C4B;
     --gold: #D9A441;
@@ -32,16 +32,20 @@
   body { min-height:100vh; }
 
   .app { max-width: 980px; margin:0 auto; padding: 20px 16px 60px; }
+  body.game-active .app {
+    max-width:640px; margin:0 auto; padding:10px 12px 30px;
+  }
+  body.game-active .title, body.game-active .subtitle { display:none; }
 
   h1.title {
     font-family:'Patrick Hand', cursive;
     text-align:center;
     font-size: clamp(2.2rem, 7vw, 3.4rem);
-    color: var(--purple-dark);
+    color: var(--pileB-color-dark);
     margin: 6px 0 2px;
     transform: rotate(-1.2deg);
   }
-  h1.title span { color: var(--green-dark); display:inline-block; transform: rotate(2deg); }
+  h1.title span { color: var(--pileA-color-dark); display:inline-block; transform: rotate(2deg); }
 
   .subtitle { text-align:center; font-family:'Patrick Hand', cursive; font-size:1.1rem; opacity:0.7; margin-bottom:16px; }
 
@@ -113,31 +117,34 @@
   .error-text { font-family:'Baloo 2', sans-serif; font-size:0.9rem; color:#B03A2E; text-align:center; min-height:1.2em; margin-top:6px; }
 
   /* ---------- Game screen ---------- */
+  #gameScreen:not(.hidden){ display:flex; flex-direction:column; }
+
   .status-bar {
     display:flex; justify-content:space-between; align-items:center;
     background:#fff; border:3px solid var(--ink); border-radius:16px;
-    padding:12px 18px; margin-bottom:16px; box-shadow:4px 4px 0 rgba(0,0,0,0.08);
-    flex-wrap:wrap; gap:10px;
+    padding:8px 16px; margin-bottom:8px; box-shadow:4px 4px 0 rgba(0,0,0,0.08);
+    flex-wrap:wrap; gap:10px; flex-shrink:0;
   }
-  .turn-label { font-family:'Patrick Hand', cursive; font-size:1.35rem; }
+  .turn-label { font-family:'Patrick Hand', cursive; font-size:1.2rem; }
   .status-actions { display:flex; gap:8px; }
 
   .prompt-bar {
     display:flex; align-items:center; justify-content:center; gap:14px;
     background: #fff; border:3px dashed var(--purple); border-radius:16px;
-    padding:12px 18px; margin-bottom:16px; flex-wrap:wrap; text-align:center;
+    padding:8px 16px; margin-bottom:8px; flex-wrap:wrap; text-align:center;
+    flex-shrink:0;
   }
-  .prompt-text { font-family:'Patrick Hand', cursive; font-size:1.2rem; color:var(--purple-dark); }
+  .prompt-text { font-family:'Patrick Hand', cursive; font-size:1.1rem; color:var(--purple-dark); }
 
   .positions-strip {
     display:flex; gap:14px; flex-wrap:wrap; font-family:'Patrick Hand', cursive;
-    font-size:0.95rem; margin-bottom:14px; justify-content:center;
+    font-size:0.9rem; margin-bottom:8px; justify-content:center; flex-shrink:0;
   }
   .positions-strip .p-item { display:flex; align-items:center; gap:5px; }
   .positions-strip .p-dot { width:12px; height:12px; border-radius:50%; border:1.5px solid var(--ink); }
 
   /* Draw piles */
-  .piles-row { display:flex; gap:34px; justify-content:center; align-items:flex-end; margin-bottom:16px; }
+  .piles-row { display:flex; gap:34px; justify-content:center; align-items:flex-end; margin-bottom:8px; flex-shrink:0; }
   .pile-stack {
     display:flex; flex-direction:column; align-items:center; gap:6px;
     padding:8px; border-radius:14px; transition: transform 0.15s ease, opacity 0.15s ease;
@@ -153,32 +160,31 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-5px); }
   }
-  .pile-cards { position:relative; width:64px; height:88px; }
+  .pile-cards { position:relative; width:56px; height:76px; }
   .pile-card {
-    position:absolute; width:56px; height:78px; border-radius:8px;
+    position:absolute; width:50px; height:68px; border-radius:8px;
     border:2.5px solid var(--ink); box-shadow:2px 2px 0 rgba(0,0,0,0.08);
   }
-  .pile-label { font-family:'Patrick Hand', cursive; font-size:1rem; }
-  .pile-hint { font-family:'Patrick Hand', cursive; font-size:0.8rem; color:var(--gold-dark); min-height:1em; }
+  .pile-label { font-family:'Patrick Hand', cursive; font-size:0.95rem; }
+  .pile-hint { font-family:'Patrick Hand', cursive; font-size:0.78rem; color:var(--gold-dark); min-height:1em; }
 
   .board-wrap {
     background:#fff; border:3px solid var(--ink); border-radius:18px;
-    padding:16px; box-shadow:6px 6px 0 rgba(0,0,0,0.08); margin-bottom:16px;
-    overflow-x:auto;
+    padding:10px; box-shadow:6px 6px 0 rgba(0,0,0,0.08); margin-bottom:8px;
   }
-  .board-inner { display:flex; justify-content:center; min-width:100%; }
-  .board-inner svg { display:block; flex-shrink:0; }
+  .board-inner { display:flex; justify-content:center; }
+  .board-inner svg { display:block; width:100%; max-width:100%; height:auto; }
 
-  .legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:14px; font-family:'Patrick Hand', cursive; font-size:0.85rem; justify-content:center; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin:0 0 8px; font-family:'Patrick Hand', cursive; font-size:0.8rem; justify-content:center; flex-shrink:0; }
   .legend-item { display:flex; align-items:center; gap:6px; }
-  .legend-swatch { width:16px; height:16px; border-radius:4px; border:2px solid var(--ink); }
+  .legend-swatch { width:14px; height:14px; border-radius:4px; border:2px solid var(--ink); }
 
-  .controls { display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; margin-bottom:16px; }
-  .die { width:64px; height:64px; background:#fff; border:3px solid var(--ink); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:800; box-shadow:4px 4px 0 rgba(0,0,0,0.12); }
-  .roll-btn { padding:14px 26px; border:3px solid var(--ink); border-radius:14px; background:var(--purple); color:#fff; font-family:'Patrick Hand', cursive; font-size:1.35rem; cursor:pointer; box-shadow:4px 4px 0 rgba(0,0,0,0.15); }
+  .controls { display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; margin-bottom:8px; flex-shrink:0; }
+  .die { width:52px; height:52px; background:#fff; border:3px solid var(--ink); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:800; box-shadow:4px 4px 0 rgba(0,0,0,0.12); }
+  .roll-btn { padding:11px 22px; border:3px solid var(--ink); border-radius:14px; background:var(--purple); color:#fff; font-family:'Patrick Hand', cursive; font-size:1.2rem; cursor:pointer; box-shadow:4px 4px 0 rgba(0,0,0,0.15); }
   .roll-btn:disabled { opacity:0.45; cursor:not-allowed; }
 
-  .log-panel { background:#fff; border:3px solid var(--ink); border-radius:16px; padding:14px 18px; max-height:130px; overflow-y:auto; font-size:0.9rem; box-shadow:4px 4px 0 rgba(0,0,0,0.08); }
+  .log-panel { background:#fff; border:3px solid var(--ink); border-radius:16px; padding:8px 16px; max-height:70px; overflow-y:auto; font-size:0.82rem; box-shadow:4px 4px 0 rgba(0,0,0,0.08); flex-shrink:0; }
   .log-panel div { margin-bottom:4px; }
   .log-panel .fresh { font-weight:700; }
 
@@ -260,7 +266,7 @@
   <!-- ONLINE CONNECT SCREEN -->
   <div id="onlineConnectScreen" class="card-panel hidden">
     <div id="storageWarning" class="notice-text hidden" style="color:#B03A2E;">
-      Couldn't connect to the online service right now. Check your internet connection and try again.
+      Couldn't load the online multiplayer service. This is almost always an ad blocker, privacy extension, or firewall blocking Google's Firebase scripts (not your internet connection) — try disabling any content/ad blockers for this page, or switching networks, then reload.
     </div>
     <label class="field-label">Create a new game</label>
     <button class="big-btn" id="createRoomBtn">Create Room</button>
@@ -338,13 +344,13 @@
     </div>
 
     <div class="board-wrap">
-      <div class="board-inner" id="boardInner"></div>
       <div class="legend">
         <div class="legend-item"><div class="legend-swatch" style="background:var(--safe-color)"></div>Safe</div>
         <div class="legend-item"><div class="legend-swatch" style="background:var(--pileA-color)"></div>Draw Pile A</div>
         <div class="legend-item"><div class="legend-swatch" style="background:var(--pileB-color)"></div>Draw Pile B</div>
         <div class="legend-item"><div class="legend-swatch" style="background:var(--gold)"></div>Finish</div>
       </div>
+      <div class="board-inner" id="boardInner"></div>
     </div>
 
     <div class="log-panel" id="logPanel"></div>
@@ -567,12 +573,19 @@
     messagingSenderId: "559512802737",
     appId: "1:559512802737:web:4abc1afa8e9a7d5a515990"
   };
-  let fbApp = null, fbDb = null, fbOk = false;
+  let fbApp = null, fbDb = null, fbOk = false, fbInitError = null;
   try{
+    if(typeof firebase === "undefined"){
+      throw new Error("Firebase SDK scripts did not load (blocked by an ad blocker/extension, a firewall, or a network filter).");
+    }
     fbApp = firebase.initializeApp(firebaseConfig);
     fbDb = firebase.database();
     fbOk = true;
-  } catch(e){ fbOk = false; }
+  } catch(e){
+    fbOk = false;
+    fbInitError = e;
+    console.error("Sneaky Snake: Firebase failed to initialize —", e);
+  }
 
   function storageOk(){ return fbOk; }
 
@@ -629,10 +642,10 @@
   }
 
   function playBackwardSound(){
-    // Classic descending "wah-wah-wah-waaah" sad trombone
-    const notes = [ [392,330], [349,294], [330,262], [294,196] ];
+    // A soft two-note descending "aww" — triangle wave instead of a harsh buzzy sawtooth
+    const notes = [ [349.23,293.66], [293.66,220] ];
     notes.forEach(([from,to], i) => {
-      tone(from, i*0.32, 0.3, {type:"sawtooth", gain:0.09, slideTo:to});
+      tone(from, i*0.28, 0.35, {type:"triangle", gain:0.06, slideTo:to});
     });
   }
 
@@ -699,6 +712,7 @@
   function showOnly(el){
     [modeScreen, setupScreen, botSetupScreen, onlineConnectScreen, lobbyScreen, gameScreen].forEach(s => s.classList.add("hidden"));
     el.classList.remove("hidden");
+    document.body.classList.toggle("game-active", el === gameScreen);
   }
 
   document.getElementById("localModeBtn").addEventListener("click", () => {
@@ -867,6 +881,7 @@
       await roomRef(roomCode).set({ started:false, players:[], seq:1 });
       enterLobby();
     } catch(e){
+      console.error("Sneaky Snake: create room failed —", e);
       connectError.textContent = "Couldn't create a room. Try again.";
     }
   });
@@ -882,6 +897,7 @@
       roomCode = code;
       enterLobby();
     } catch(e){
+      console.error("Sneaky Snake: join room failed —", e);
       connectError.textContent = "Room not found.";
     }
   });
