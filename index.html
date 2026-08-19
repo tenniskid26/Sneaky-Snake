@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sneaky Snake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --paper: #F4EEDC;
+    --ink: #2B2320;
+    --pink: #F5D033;
+    --pink-dark: #D9AE0E;
+    --purple: #4CAF50;
+    --purple-dark: #2E7D32;
+    --green: #8FAE64;
+    --green-dark: #708C4B;
+    --gold: #D9A441;
+    --gold-dark: #B9852A;
+    --safe-color: #7FD1E0;
+    --safe-color-dark: #4FB3C7;
+    --pileA-color: #4CAF50;
+    --pileA-color-dark: #388E3C;
+    --pileB-color: #F5D033;
+    --pileB-color-dark: #D9AE0E;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:'Baloo 2', sans-serif; }
+  body { min-height:100vh; }
+
+  .app { max-width: 980px; margin:0 auto; padding: 20px 16px 60px; }
+  body.game-active .app {
+    max-width:640px; margin:0 auto; padding:10px 12px 30px;
+  }
+  body.game-active .title, body.game-active .subtitle { display:none; }
+
+  h1.title {
+    font-family:'Patrick Hand', cursive;
+    text-align:center;
+    font-size: clamp(2.2rem, 7vw, 3.4rem);
+    color: var(--pileB-color-dark);
+    margin: 6px 0 2px;
+    transform: rotate(-1.2deg);
+  }
+  h1.title span { color: var(--pileA-color-dark); display:inline-block; transform: rotate(2deg); }
+
+  .subtitle { text-align:center; font-family:'Patrick Hand', cursive; font-size:1.1rem; opacity:0.7; margin-bottom:16px; }
+
+  .icon-btn {
+    width:40px; height:40px; border-radius:50%;
+    border:2px solid var(--ink); background:#fff;
+    font-family:'Patrick Hand', cursive; font-size:1.2rem;
+    cursor:pointer; box-shadow:3px 3px 0 rgba(0,0,0,0.1);
+  }
+  .icon-btn:hover { transform: translate(-1px,-1px); }
+
+  /* ---------- Shared card-style panels ---------- */
+  .card-panel {
+    background:#fff; border:3px solid var(--ink); border-radius:18px;
+    padding:24px; box-shadow:6px 6px 0 rgba(0,0,0,0.08);
+    max-width:560px; margin:0 auto;
+  }
+  .field-label { font-family:'Patrick Hand', cursive; font-size:1.3rem; margin-bottom:6px; display:block; color:var(--purple-dark); }
+  .count-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  .count-btn { width:44px; height:44px; border-radius:50%; border:2px solid var(--ink); background:var(--pink); font-weight:700; cursor:pointer; }
+  .count-btn.active { background:var(--purple); color:#fff; }
+  .board-size-btn { padding:10px 16px; border-radius:12px; border:2px solid var(--ink); background:var(--pink); font-weight:700; cursor:pointer; font-family:'Baloo 2', sans-serif; font-size:0.95rem; }
+  .board-size-btn.active { background:var(--purple); color:#fff; }
+
+  .name-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .token-dot { width:20px; height:20px; border-radius:50%; border:2px solid var(--ink); flex-shrink:0; }
+  .name-input { flex:1; padding:10px 12px; border:2px solid var(--ink); border-radius:10px; font-family:'Baloo 2', sans-serif; font-size:1rem; background:#FBF8F0; }
+  .name-input:focus { outline:3px solid var(--gold); outline-offset:1px; }
+  .ai-toggle {
+    padding:8px 10px; border:2px solid var(--ink); border-radius:10px;
+    background:#eee; font-size:0.85rem; cursor:pointer; white-space:nowrap;
+    font-family:'Baloo 2', sans-serif; font-weight:700;
+  }
+  .ai-toggle.active { background: var(--green); color:#fff; }
+
+  .big-btn {
+    display:block; width:100%; padding:14px; margin-top:14px;
+    border:3px solid var(--ink); border-radius:14px; background:var(--gold);
+    font-family:'Patrick Hand', cursive; font-size:1.4rem; cursor:pointer;
+    box-shadow:4px 4px 0 rgba(0,0,0,0.15);
+  }
+  .big-btn:hover { transform: translate(-2px,-2px); box-shadow:6px 6px 0 rgba(0,0,0,0.15); }
+  .big-btn:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+  .big-btn.secondary { background:#eee; }
+  .big-btn.small { display:inline-block; width:auto; padding:10px 20px; margin-top:0; font-size:1.15rem; }
+
+  .btn-row { display:flex; gap:10px; }
+  .btn-row .big-btn { margin-top:0; }
+
+  .hidden { display:none !important; }
+
+  .mode-btn {
+    display:block; width:100%; padding:20px; margin-bottom:14px;
+    border:3px solid var(--ink); border-radius:16px; background:#fff;
+    font-family:'Patrick Hand', cursive; font-size:1.3rem; cursor:pointer;
+    box-shadow:4px 4px 0 rgba(0,0,0,0.1); text-align:left;
+  }
+  .mode-btn:hover { transform: translate(-2px,-2px); box-shadow:6px 6px 0 rgba(0,0,0,0.1); }
+  .mode-btn .sub { display:block; font-family:'Baloo 2', sans-serif; font-size:0.85rem; opacity:0.65; margin-top:2px; }
+
+  .room-code-display {
+    text-align:center; font-family:'Patrick Hand', cursive; font-size:2.2rem;
+    letter-spacing:6px; color: var(--purple-dark); background: var(--pink);
+    border:3px solid var(--ink); border-radius:14px; padding:12px; margin: 10px 0 18px;
+  }
+  .joined-list { margin: 8px 0 16px; }
+  .joined-item { display:flex; align-items:center; gap:8px; padding:6px 0; font-family:'Patrick Hand', cursive; font-size:1.1rem; }
+  .notice-text { font-family:'Patrick Hand', cursive; font-size:0.95rem; color:var(--purple-dark); text-align:center; margin: 10px 0; }
+  .error-text { font-family:'Baloo 2', sans-serif; font-size:0.9rem; color:#B03A2E; text-align:center; min-height:1.2em; margin-top:6px; }
+
+  /* ---------- Game screen ---------- */
+  #gameScreen:not(.hidden){ display:flex; flex-direction:column; }
+
+  .status-bar {
+    display:flex; justify-content:space-between; align-items:center;
+    background:#fff; border:3px solid var(--ink); border-radius:16px;
+    padding:8px 16px; margin-bottom:8px; box-shadow:4px 4px 0 rgba(0,0,0,0.08);
+    flex-wrap:wrap; gap:10px; flex-shrink:0;
+  }
+  .turn-label { font-family:'Patrick Hand', cursive; font-size:1.2rem; }
+  .status-actions { display:flex; gap:8px; }
+
+  .prompt-bar {
+    display:flex; align-items:center; justify-content:center; gap:14px;
+    background: #fff; border:3px dashed var(--purple); border-radius:16px;
+    padding:8px 16px; margin-bottom:8px; flex-wrap:wrap; text-align:center;
+    flex-shrink:0;
+  }
+  .prompt-text { font-family:'Patrick Hand', cursive; font-size:1.1rem; color:var(--purple-dark); }
+
+  .positions-strip {
+    display:flex; gap:14px; flex-wrap:wrap; font-family:'Patrick Hand', cursive;
+    font-size:0.9rem; margin-bottom:8px; justify-content:center; flex-shrink:0;
+  }
+  .positions-strip .p-item { display:flex; align-items:center; gap:5px; }
+  .positions-strip .p-dot { width:12px; height:12px; border-radius:50%; border:1.5px solid var(--ink); }
+
+  /* Draw piles */
+  .piles-row { display:flex; gap:34px; justify-content:center; align-items:flex-end; margin-bottom:8px; flex-shrink:0; }
+  .pile-stack {
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:8px; border-radius:14px; transition: transform 0.15s ease, opacity 0.15s ease;
+    border: 3px solid transparent;
+  }
+  .pile-stack.pile-active {
+    cursor:pointer; border-color: var(--gold-dark);
+    background: #FFF7E6;
+    animation: pileBounce 0.9s ease-in-out infinite;
+  }
+  .pile-stack.pile-inactive { opacity: 0.4; pointer-events:none; }
+  @keyframes pileBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  .pile-cards { position:relative; width:56px; height:76px; }
+  .pile-card {
+    position:absolute; width:50px; height:68px; border-radius:8px;
+    border:2.5px solid var(--ink); box-shadow:2px 2px 0 rgba(0,0,0,0.08);
+  }
+  .pile-label { font-family:'Patrick Hand', cursive; font-size:0.95rem; }
+  .pile-hint { font-family:'Patrick Hand', cursive; font-size:0.78rem; color:var(--gold-dark); min-height:1em; }
+
+  .board-wrap {
+    background:#fff; border:3px solid var(--ink); border-radius:18px;
+    padding:10px; box-shadow:6px 6px 0 rgba(0,0,0,0.08); margin-bottom:8px;
+  }
+  .board-inner { display:flex; justify-content:center; }
+  .board-inner svg { display:block; width:100%; max-width:100%; height:auto; }
+
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin:0 0 8px; font-family:'Patrick Hand', cursive; font-size:0.8rem; justify-content:center; flex-shrink:0; }
+  .legend-item { display:flex; align-items:center; gap:6px; }
+  .legend-swatch { width:14px; height:14px; border-radius:4px; border:2px solid var(--ink); }
+
+  .controls { display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; margin-bottom:8px; flex-shrink:0; }
+  .die { width:52px; height:52px; background:#fff; border:3px solid var(--ink); border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:800; box-shadow:4px 4px 0 rgba(0,0,0,0.12); }
+  .roll-btn { padding:11px 22px; border:3px solid var(--ink); border-radius:14px; background:var(--purple); color:#fff; font-family:'Patrick Hand', cursive; font-size:1.2rem; cursor:pointer; box-shadow:4px 4px 0 rgba(0,0,0,0.15); }
+  .roll-btn:disabled { opacity:0.45; cursor:not-allowed; }
+
+  .log-panel { background:#fff; border:3px solid var(--ink); border-radius:16px; padding:8px 16px; max-height:70px; overflow-y:auto; font-size:0.82rem; box-shadow:4px 4px 0 rgba(0,0,0,0.08); flex-shrink:0; }
+  .log-panel div { margin-bottom:4px; }
+  .log-panel .fresh { font-weight:700; }
+
+  /* ---------- Modals ---------- */
+  .overlay { position:fixed; inset:0; background:rgba(43,35,32,0.55); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px; }
+  .modal { background:#fff; border:3px solid var(--ink); border-radius:18px; padding:26px; max-width:400px; width:100%; text-align:center; box-shadow:8px 8px 0 rgba(0,0,0,0.2); }
+  .modal.help-modal { max-width: 460px; text-align:left; max-height: 82vh; overflow-y:auto; }
+  .modal.help-modal h3 { font-family:'Patrick Hand', cursive; font-size:1.4rem; margin:14px 0 6px; color: var(--purple-dark); }
+  .modal.help-modal p { margin: 4px 0; line-height:1.4; font-size:0.95rem; }
+
+  .pile-tag { display:inline-block; font-family:'Patrick Hand', cursive; font-size:1rem; padding:3px 14px; border-radius:20px; border:2px solid var(--ink); margin-bottom:14px; }
+  .pile-tag.A { background:var(--pileA-color); color:#fff; }
+  .pile-tag.B { background:var(--pileB-color); color:var(--ink); }
+  .modal .card-text { font-family:'Patrick Hand', cursive; font-size:1.55rem; margin:8px 0 20px; }
+
+  .swap-list { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+  .swap-choice { padding:10px; border:2px solid var(--ink); border-radius:10px; background:var(--pink); cursor:pointer; font-weight:700; }
+  .swap-choice:hover { background:var(--pink-dark); }
+
+  .winner-modal .card-text { font-size:2rem; }
+
+  .flying-card { position:fixed; border-radius:8px; border:2.5px solid var(--ink); box-shadow:3px 3px 0 rgba(0,0,0,0.15); z-index:80; pointer-events:none; }
+
+  footer.credit { text-align:center; font-size:0.78rem; opacity:0.45; margin-top:22px; font-family:'Patrick Hand', cursive; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1 class="title">Sneaky <span>Snake</span></h1>
+  <div class="subtitle" id="subtitleText">First to land exactly on the end wins!</div>
+
+  <!-- MODE SELECT -->
+  <div id="modeScreen" class="card-panel">
+    <label class="field-label">How do you want to play?</label>
+    <button class="mode-btn" id="localModeBtn">
+      🛋️ Local (pass &amp; play)
+      <span class="sub">Everyone shares one device, taking turns.</span>
+    </button>
+    <button class="mode-btn" id="botModeBtn">
+      🤖 Play with Bots
+      <span class="sub">Just you vs. one or more computer players.</span>
+    </button>
+    <button class="mode-btn" id="onlineModeBtn">
+      🌐 Online (separate devices)
+      <span class="sub">Each player joins from their own phone with a room code.</span>
+    </button>
+  </div>
+
+  <!-- LOCAL SETUP SCREEN -->
+  <div id="setupScreen" class="card-panel hidden">
+    <label class="field-label">How many players?</label>
+    <div class="count-row" id="countRow"></div>
+
+    <label class="field-label">Board size</label>
+    <div class="count-row" id="boardSizeRow"></div>
+
+    <label class="field-label">Players</label>
+    <div id="nameFields"></div>
+
+    <button class="big-btn" id="startBtn">Let's Play</button>
+    <button class="big-btn secondary" id="backFromLocalBtn">Back</button>
+  </div>
+
+  <!-- BOT SETUP SCREEN -->
+  <div id="botSetupScreen" class="card-panel hidden">
+    <label class="field-label">Your name</label>
+    <input class="name-input" id="botYourNameInput" placeholder="Your name" maxlength="16" style="margin-bottom:18px;">
+
+    <label class="field-label">How many bot opponents?</label>
+    <div class="count-row" id="botCountRow"></div>
+
+    <label class="field-label">Board size</label>
+    <div class="count-row" id="botBoardSizeRow"></div>
+
+    <button class="big-btn" id="startBotBtn">Let's Play</button>
+    <button class="big-btn secondary" id="backFromBotBtn">Back</button>
+  </div>
+
+  <!-- ONLINE CONNECT SCREEN -->
+  <div id="onlineConnectScreen" class="card-panel hidden">
+    <div id="storageWarning" class="notice-text hidden" style="color:#B03A2E;">
+      Couldn't load the online multiplayer service. This is almost always an ad blocker, privacy extension, or firewall blocking Google's Firebase scripts (not your internet connection) — try disabling any content/ad blockers for this page, or switching networks, then reload.
+    </div>
+    <label class="field-label">Create a new game</label>
+    <button class="big-btn" id="createRoomBtn">Create Room</button>
+
+    <label class="field-label" style="margin-top:20px;">Or join one</label>
+    <input class="name-input" id="joinCodeInput" placeholder="Enter room code" maxlength="4" style="text-transform:uppercase; margin-bottom:10px;">
+    <button class="big-btn" id="joinRoomBtn">Join Room</button>
+    <div class="error-text" id="connectError"></div>
+    <button class="big-btn secondary" id="backFromConnectBtn">Back</button>
+  </div>
+
+  <!-- ONLINE LOBBY SCREEN -->
+  <div id="lobbyScreen" class="card-panel hidden">
+    <label class="field-label">Room code — share this with friends</label>
+    <div class="room-code-display" id="lobbyCode">----</div>
+
+    <label class="field-label">Players joined</label>
+    <div class="joined-list" id="joinedList"></div>
+
+    <label class="field-label">Board size</label>
+    <div class="count-row" id="lobbyBoardSizeRow"></div>
+
+    <div id="joinFormArea">
+      <input class="name-input" id="lobbyNameInput" placeholder="Your name" maxlength="16" style="margin-bottom:10px;">
+      <button class="big-btn" id="lobbyJoinBtn">Join Game</button>
+      <div class="error-text" id="lobbyError"></div>
+    </div>
+
+    <button class="big-btn" id="lobbyStartBtn" disabled>Start Game (need 2+ players)</button>
+    <button class="big-btn secondary" id="backFromLobbyBtn">Leave</button>
+  </div>
+
+  <!-- GAME SCREEN (shared by local + online) -->
+  <div id="gameScreen" class="hidden">
+    <div class="status-bar">
+      <div class="turn-label">Turn: <span id="turnName">-</span></div>
+      <div class="status-actions">
+        <button class="icon-btn" id="muteBtn" title="Toggle sound">🔊</button>
+        <button class="icon-btn help-trigger" title="How to play">?</button>
+        <button class="icon-btn" id="quitBtn" title="Quit to home">🏠</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="die" id="dieFace">🎲</div>
+      <button class="roll-btn" id="rollBtn">Roll the Die</button>
+    </div>
+
+    <div class="prompt-bar">
+      <div class="prompt-text" id="promptText">Get ready...</div>
+      <button class="big-btn small hidden" id="nextTurnBtn">Next Turn ▶</button>
+    </div>
+
+    <div class="positions-strip" id="positionsStrip"></div>
+
+    <div class="piles-row">
+      <div class="pile-stack" id="pileAWrap">
+        <div class="pile-cards" id="pileAStack">
+          <div class="pile-card" style="background:var(--pileA-color); top:6px; left:4px;"></div>
+          <div class="pile-card" style="background:var(--pileA-color); top:3px; left:2px;"></div>
+          <div class="pile-card" style="background:var(--pileA-color); top:0; left:0;"></div>
+        </div>
+        <div class="pile-label">Pile A</div>
+        <div class="pile-hint" id="pileAHint"></div>
+      </div>
+      <div class="pile-stack" id="pileBWrap">
+        <div class="pile-cards" id="pileBStack">
+          <div class="pile-card" style="background:var(--pileB-color); top:6px; left:4px;"></div>
+          <div class="pile-card" style="background:var(--pileB-color); top:3px; left:2px;"></div>
+          <div class="pile-card" style="background:var(--pileB-color); top:0; left:0;"></div>
+        </div>
+        <div class="pile-label">Pile B</div>
+        <div class="pile-hint" id="pileBHint"></div>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--safe-color)"></div>Safe</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--pileA-color)"></div>Draw Pile A</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--pileB-color)"></div>Draw Pile B</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--gold)"></div>Finish</div>
+      </div>
+      <div class="board-inner" id="boardInner"></div>
+    </div>
+
+    <div class="log-panel" id="logPanel"></div>
+  </div>
+
+  <footer class="credit">Sneaky Snake &mdash; a homemade game, digitized</footer>
+</div>
+
+<div class="overlay hidden" id="cardOverlay">
+  <div class="modal">
+    <div class="pile-tag" id="cardPileTag">Pile A</div>
+    <div class="card-text" id="cardText">Forward 3</div>
+    <div id="swapArea"></div>
+    <button class="big-btn hidden" id="cardOkBtn">Do it!</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="winOverlay">
+  <div class="modal winner-modal">
+    <div class="card-text" id="winText">🎉 Winner! 🎉</div>
+    <button class="big-btn" id="playAgainBtn">Return to Home</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="helpOverlay">
+  <div class="modal help-modal">
+    <h3>How to play Sneaky Snake</h3>
+    <p>Tap "Roll the Die" to move that many squares along the snake. Every square is numbered so you can always see exactly where you are.</p>
+    <h3>🩵 Light blue squares</h3>
+    <p>Safe! Nothing happens — your turn ends.</p>
+    <h3>💚 Green &amp; 💛 Yellow squares</h3>
+    <p>Tap the matching draw pile to pull a card, then tap "Do it!" to carry out what it says. If that lands you on another green or yellow square, tap that pile again! Your turn only ends when you land on a light blue square, or a "stay where you are" card comes up. Your very first card of the game is never a "move backward" card, so no one gets unlucky right out of the gate.</p>
+    <h3>🏁 Winning</h3>
+    <p>You must land exactly on the END square (the snake's head) to win. If your move would take you past it, you don't move that turn.</p>
+    <h3>📏 Board size</h3>
+    <p>Before starting, pick a Standard board (80 squares) or a Short board (50 squares) — either way you get a freshly shuffled layout and card piles each game.</p>
+    <h3>🤖 Playing with bots</h3>
+    <p>Choose "Play with Bots" from the home screen to play solo against one or more computer opponents — they roll, draw cards, and move automatically.</p>
+    <h3>🌐 Online mode</h3>
+    <p>Each player joins from their own device with a room code. Only the current player's device is interactive — everyone else just watches until it's their turn.</p>
+    <h3>🔊 Sound</h3>
+    <p>Tap the speaker icon during a game to mute or unmute the music and sound effects.</p>
+    <h3>🏠 Quitting</h3>
+    <p>Tap the house icon any time to end the game and go back to setup.</p>
+    <button class="big-btn" id="helpOkBtn">Got it</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="quitOverlay">
+  <div class="modal">
+    <div class="card-text" style="font-size:1.3rem;">Quit this game and go back to the home screen?</div>
+    <div class="btn-row">
+      <button class="big-btn secondary" id="quitNoBtn">Cancel</button>
+      <button class="big-btn" id="quitYesBtn">Yes, quit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Config ----------
+  const COLS = 10;
+  let ROWS = 8;
+  let BOARD_LENGTH = COLS * ROWS; // 80
+  let FINISH_INDEX = BOARD_LENGTH - 1;
+  const TOKEN_COLORS = ["#E8384F","#1E88E5","#FFC400","#2ECC71","#9B59B6","#FF4FA3","#17C3B2","#FF8C1A"];
+  const STEP_MS = 150;
+
+  const COLOR_HEX = { safe:"#7FD1E0", A:"#4CAF50", B:"#F5D033", gold:"#D9A441", ink:"#2B2320" };
+
+  // ---------- Layout geometry for the SVG snake ----------
+  const cellLen = 58;
+  const trackWidth = 50;
+  const gap = 24;
+  const P = trackWidth + gap;
+  const R = P / 2;
+  const marginX = R + 16;
+  const topMargin = 10;
+  const L = COLS * cellLen;
+  const svgWidth = L + marginX * 2;
+  let svgHeight = topMargin * 2 + (ROWS - 1) * P + trackWidth;
+
+  // Recomputes all board-size-dependent geometry. rows=8 -> 80 squares
+  // (standard), rows=5 -> 50 squares (short board).
+  function configureBoardSize(rows){
+    ROWS = rows;
+    BOARD_LENGTH = COLS * ROWS;
+    FINISH_INDEX = BOARD_LENGTH - 1;
+    svgHeight = topMargin * 2 + (ROWS - 1) * P + trackWidth;
+  }
+
+  const PILE_A = [
+    {type:"forward", value:3, text:"Move forward 3"},
+    {type:"backward", value:9, text:"Move backward 9"},
+    {type:"stay", value:0, text:"Stay where you are"},
+    {type:"forward", value:1, text:"Move forward 1"},
+    {type:"backward", value:7, text:"Move backward 7"},
+    {type:"forward", value:7, text:"Move forward 7"},
+    {type:"forward", value:2, text:"Move forward 2"},
+    {type:"backward", value:5, text:"Move backward 5"}
+  ];
+  const PILE_B = [
+    {type:"forward", value:9, text:"Move forward 9"},
+    {type:"backward", value:7, text:"Move backward 7"},
+    {type:"forward", value:2, text:"Move forward 2"},
+    {type:"stay", value:0, text:"Stay where you are"},
+    {type:"forward", value:1, text:"Move forward 1"},
+    {type:"backward", value:3, text:"Move backward 3"},
+    {type:"forward", value:3, text:"Move forward 3"},
+    {type:"forward", value:4, text:"Move forward 4"}
+  ];
+
+  function shuffledPile(pile){
+    const copy = pile.slice();
+    for(let i = copy.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  // Shuffle a fresh pile, but guarantee the very first card drawn from it
+  // is never a "backward" card — bad luck on turn one feels unfair.
+  function freshShuffledPile(pile){
+    const copy = shuffledPile(pile);
+    if(copy[0] && copy[0].type === "backward"){
+      const swapIdx = copy.findIndex(c => c.type !== "backward");
+      if(swapIdx > 0){
+        const tmp = copy[0];
+        copy[0] = copy[swapIdx];
+        copy[swapIdx] = tmp;
+      }
+    }
+    return copy;
+  }
+
+  function buildRandomBoard(){
+    const squares = [];
+    let last1 = null, last2 = null;
+    for(let i=0;i<BOARD_LENGTH;i++){
+      if(i===0 || i===FINISH_INDEX){ squares.push("safe"); last2 = last1; last1 = "safe"; continue; }
+      let choice, attempts = 0;
+      do {
+        const roll = Math.random();
+        choice = roll < 0.26 ? "safe" : (roll < 0.63 ? "A" : "B");
+        attempts++;
+      } while(choice === last1 && choice === last2 && attempts < 10);
+      squares.push(choice);
+      last2 = last1;
+      last1 = choice;
+    }
+    return squares;
+  }
+
+  function wait(ms){ return new Promise(res=>setTimeout(res, ms)); }
+  function clampBackward(pos){ return pos < 0 ? 0 : pos; }
+
+  function rowOf(i){ return Math.floor(i / COLS); }
+  function physicalCol(i){
+    const r = rowOf(i);
+    const localIdx = i - r * COLS;
+    return (r % 2 === 0) ? localIdx : (COLS - 1 - localIdx);
+  }
+  function cellCenter(i){
+    const r = rowOf(i);
+    const pcol = physicalCol(i);
+    const x = marginX + pcol * cellLen + cellLen / 2;
+    const y = topMargin + trackWidth / 2 + r * P;
+    return { x, y };
+  }
+  function rowCenterY(r){ return topMargin + trackWidth / 2 + r * P; }
+
+  function arcPoints(cx, cy, r, bulgeDir, steps){
+    const pts = [];
+    for(let k=0;k<=steps;k++){
+      const theta = -90 + (180 * k / steps);
+      const rad = theta * Math.PI / 180;
+      pts.push([ cx + bulgeDir * r * Math.cos(rad), cy + r * Math.sin(rad) ]);
+    }
+    return pts;
+  }
+  function elbowPathD(cx, cy, Ro, Ri, bulgeDir){
+    const outer = arcPoints(cx, cy, Ro, bulgeDir, 20);
+    const inner = arcPoints(cx, cy, Ri, bulgeDir, 20).reverse();
+    const all = outer.concat(inner);
+    let d = `M ${all[0][0].toFixed(1)} ${all[0][1].toFixed(1)} `;
+    for(let k=1;k<all.length;k++) d += `L ${all[k][0].toFixed(1)} ${all[k][1].toFixed(1)} `;
+    d += "Z";
+    return d;
+  }
+
+  function encodePile(pileArr, defArr){ return pileArr.map(c => defArr.indexOf(c)); }
+  function decodePile(idxArr, defArr){ return idxArr.map(i => defArr[i]); }
+
+  // ---------- State ----------
+  let BOARD = buildRandomBoard();
+  let pileA = [], pileB = [];
+  let players = [];
+  let currentIdx = 0;
+  let gameOver = false;
+  let numPlayers = 3;
+
+  // Online-mode state
+  let isOnlineMode = false;
+  let roomCode = null;
+  let mySeatIndex = -1;
+  let lastKnownSeq = 0;
+  let myTurnRunning = false;
+  let lobbyListenerRef = null;
+  let gameListenerRef = null;
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyD51YdoGeHN2dKdd3YnYShNTq1HJCTZamA",
+    authDomain: "sneaky-snake-79bd7.firebaseapp.com",
+    databaseURL: "https://sneaky-snake-79bd7-default-rtdb.firebaseio.com",
+    projectId: "sneaky-snake-79bd7",
+    storageBucket: "sneaky-snake-79bd7.firebasestorage.app",
+    messagingSenderId: "559512802737",
+    appId: "1:559512802737:web:4abc1afa8e9a7d5a515990"
+  };
+  let fbApp = null, fbDb = null, fbOk = false, fbInitError = null;
+  try{
+    if(typeof firebase === "undefined"){
+      throw new Error("Firebase SDK scripts did not load (blocked by an ad blocker/extension, a firewall, or a network filter).");
+    }
+    fbApp = firebase.initializeApp(firebaseConfig);
+    fbDb = firebase.database();
+    fbOk = true;
+  } catch(e){
+    fbOk = false;
+    fbInitError = e;
+    console.error("Sneaky Snake: Firebase failed to initialize —", e);
+  }
+
+  function storageOk(){ return fbOk; }
+
+  // ================= SOUND (synthesized — no external audio files) =================
+  let audioCtx = null;
+  let musicMuted = false;
+  let musicTimer = null;
+  let musicStep = 0;
+
+  function ensureAudioCtx(){
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch(e){ audioCtx = null; }
+    }
+    if(audioCtx && audioCtx.state === "suspended"){ audioCtx.resume(); }
+    return audioCtx;
+  }
+
+  function tone(freq, startOffset, duration, opts){
+    const ctx = ensureAudioCtx();
+    if(!ctx || musicMuted) return;
+    opts = opts || {};
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = opts.type || "sine";
+    const t0 = ctx.currentTime + (startOffset || 0);
+    osc.frequency.setValueAtTime(freq, t0);
+    if(opts.slideTo){
+      osc.frequency.exponentialRampToValueAtTime(Math.max(opts.slideTo, 1), t0 + duration);
+    }
+    const peak = opts.gain != null ? opts.gain : 0.12;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(0.03, duration/4));
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.05);
+  }
+
+  function playClickSound(){ tone(700, 0, 0.07, {type:"square", gain:0.05}); }
+
+  function playDiceSound(){
+    for(let i=0;i<4;i++){
+      tone(280 + Math.random()*260, i*0.06, 0.05, {type:"square", gain:0.06});
+    }
+  }
+
+  function playForwardSound(){
+    // Cheerful ascending chime + a little sparkle — our "applause" for good news
+    [523.25,659.25,783.99,1046.5].forEach((f,i)=> tone(f, i*0.07, 0.18, {type:"triangle", gain:0.10}));
+    for(let i=0;i<10;i++){
+      tone(1800 + Math.random()*1400, 0.24 + Math.random()*0.18, 0.05, {type:"square", gain:0.02});
+    }
+  }
+
+  function playBackwardSound(){
+    // A soft two-note descending "aww" — triangle wave instead of a harsh buzzy sawtooth
+    const notes = [ [349.23,293.66], [293.66,220] ];
+    notes.forEach(([from,to], i) => {
+      tone(from, i*0.28, 0.35, {type:"triangle", gain:0.06, slideTo:to});
+    });
+  }
+
+  function playStaySound(){
+    tone(440, 0, 0.14, {type:"sine", gain:0.08});
+    tone(392, 0.12, 0.18, {type:"sine", gain:0.08});
+  }
+
+  function playWinSound(){
+    [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=> tone(f, i*0.12, 0.35, {type:"triangle", gain:0.12}));
+  }
+
+  // Gentle looping background melody, low volume, runs while the tab is open
+  const MUSIC_NOTES = [392,440,523.25,440,392,349.23,392,523.25,587.33,523.25,440,392];
+  function scheduleMusicStep(){
+    if(!musicMuted){
+      const freq = MUSIC_NOTES[musicStep % MUSIC_NOTES.length];
+      tone(freq, 0, 0.5, {type:"sine", gain:0.045});
+      musicStep++;
+    }
+    musicTimer = setTimeout(scheduleMusicStep, 420);
+  }
+  function startBackgroundMusic(){
+    if(musicTimer) return;
+    ensureAudioCtx();
+    scheduleMusicStep();
+  }
+
+  function updateMuteBtn(){
+    const btn = document.getElementById("muteBtn");
+    if(btn) btn.textContent = musicMuted ? "🔇" : "🔊";
+  }
+  document.addEventListener("click", (e) => {
+    if(e.target.closest && e.target.closest("#muteBtn")){
+      musicMuted = !musicMuted;
+      updateMuteBtn();
+    }
+  });
+
+  // Start audio + music on the very first click anywhere (browsers block audio
+  // until a user gesture), and give every button a soft click sound.
+  let audioStarted = false;
+  document.addEventListener("click", (e) => {
+    if(!audioStarted){
+      audioStarted = true;
+      ensureAudioCtx();
+      startBackgroundMusic();
+    }
+    const btn = e.target.closest && e.target.closest("button");
+    if(btn && btn.id !== "muteBtn"){
+      playClickSound();
+    }
+  }, true);
+  function roomRef(code){ return fbDb.ref("rooms/" + code); }
+
+  // ================= MODE SELECT =================
+  const modeScreen = document.getElementById("modeScreen");
+  const setupScreen = document.getElementById("setupScreen");
+  const botSetupScreen = document.getElementById("botSetupScreen");
+  const onlineConnectScreen = document.getElementById("onlineConnectScreen");
+  const lobbyScreen = document.getElementById("lobbyScreen");
+  const gameScreen = document.getElementById("gameScreen");
+
+  function showOnly(el){
+    [modeScreen, setupScreen, botSetupScreen, onlineConnectScreen, lobbyScreen, gameScreen].forEach(s => s.classList.add("hidden"));
+    el.classList.remove("hidden");
+    document.body.classList.toggle("game-active", el === gameScreen);
+  }
+
+  document.getElementById("localModeBtn").addEventListener("click", () => {
+    showOnly(setupScreen);
+  });
+  document.getElementById("backFromLocalBtn").addEventListener("click", () => showOnly(modeScreen));
+
+  document.getElementById("botModeBtn").addEventListener("click", () => {
+    showOnly(botSetupScreen);
+  });
+  document.getElementById("backFromBotBtn").addEventListener("click", () => showOnly(modeScreen));
+
+  document.getElementById("onlineModeBtn").addEventListener("click", () => {
+    const warn = document.getElementById("storageWarning");
+    if(!storageOk()){
+      warn.classList.remove("hidden");
+    } else {
+      warn.classList.add("hidden");
+    }
+    showOnly(onlineConnectScreen);
+  });
+  document.getElementById("backFromConnectBtn").addEventListener("click", () => showOnly(modeScreen));
+
+  // ================= Board size selector (shared helper) =================
+  function renderBoardSizeRow(containerId, initialRows, onChange){
+    const row = document.getElementById(containerId);
+    let current = initialRows;
+    const options = [ { label:"Standard (80)", rows:8 }, { label:"Short (50)", rows:5 } ];
+    options.forEach(opt => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "board-size-btn" + (opt.rows === current ? " active" : "");
+      b.textContent = opt.label;
+      b.addEventListener("click", () => {
+        current = opt.rows;
+        [...row.children].forEach(c => c.classList.remove("active"));
+        b.classList.add("active");
+        onChange(current);
+      });
+      row.appendChild(b);
+    });
+    return { get: () => current };
+  }
+
+  // ================= LOCAL SETUP =================
+  const countRow = document.getElementById("countRow");
+  const nameFields = document.getElementById("nameFields");
+  let localBoardRows = 8;
+  renderBoardSizeRow("boardSizeRow", 8, (rows) => { localBoardRows = rows; });
+  for(let n=2; n<=8; n++){
+    const b = document.createElement("button");
+    b.className = "count-btn" + (n===numPlayers ? " active" : "");
+    b.textContent = n;
+    b.addEventListener("click", ()=>{
+      numPlayers = n;
+      [...countRow.children].forEach(c=>c.classList.remove("active"));
+      b.classList.add("active");
+      renderNameFields();
+    });
+    countRow.appendChild(b);
+  }
+
+  function renderNameFields(){
+    nameFields.innerHTML = "";
+    for(let i=0;i<numPlayers;i++){
+      const row = document.createElement("div");
+      row.className = "name-row";
+
+      const dot = document.createElement("div");
+      dot.className = "token-dot";
+      dot.style.background = TOKEN_COLORS[i];
+
+      const input = document.createElement("input");
+      input.className = "name-input";
+      input.placeholder = "Player " + (i+1);
+      input.maxLength = 16;
+      input.id = "nameInput" + i;
+
+      row.appendChild(dot);
+      row.appendChild(input);
+      nameFields.appendChild(row);
+    }
+  }
+  renderNameFields();
+
+  document.getElementById("startBtn").addEventListener("click", () => {
+    isOnlineMode = false;
+    players = [];
+    for(let i=0;i<numPlayers;i++){
+      const val = document.getElementById("nameInput"+i).value.trim();
+      players.push({
+        name: val || "Player " + (i+1),
+        pos: 0,
+        color: TOKEN_COLORS[i],
+        isAI: false
+      });
+    }
+    configureBoardSize(localBoardRows);
+    BOARD = buildRandomBoard();
+    pileA = freshShuffledPile(PILE_A);
+    pileB = freshShuffledPile(PILE_B);
+    currentIdx = 0;
+    gameOver = false;
+    showOnly(gameScreen);
+    document.getElementById("logPanel").innerHTML = "";
+    renderBoard();
+    renderStatus();
+    setPileState(null);
+    logMsg(`Game started with ${players.length} players. ${players[0].name} goes first!`);
+    beginTurn();
+  });
+
+  // ================= BOT SETUP =================
+  const botCountRow = document.getElementById("botCountRow");
+  let botCount = 1;
+  let botBoardRows = 8;
+  renderBoardSizeRow("botBoardSizeRow", 8, (rows) => { botBoardRows = rows; });
+  for(let n=1; n<=7; n++){
+    const b = document.createElement("button");
+    b.className = "count-btn" + (n===botCount ? " active" : "");
+    b.textContent = n;
+    b.addEventListener("click", ()=>{
+      botCount = n;
+      [...botCountRow.children].forEach(c=>c.classList.remove("active"));
+      b.classList.add("active");
+    });
+    botCountRow.appendChild(b);
+  }
+
+  document.getElementById("startBotBtn").addEventListener("click", () => {
+    isOnlineMode = false;
+    const yourName = document.getElementById("botYourNameInput").value.trim();
+    players = [{ name: yourName || "Player 1", pos: 0, color: TOKEN_COLORS[0], isAI: false }];
+    for(let i=0;i<botCount;i++){
+      players.push({ name: "Computer " + (i+1), pos: 0, color: TOKEN_COLORS[i+1], isAI: true });
+    }
+    configureBoardSize(botBoardRows);
+    BOARD = buildRandomBoard();
+    pileA = freshShuffledPile(PILE_A);
+    pileB = freshShuffledPile(PILE_B);
+    currentIdx = 0;
+    gameOver = false;
+    showOnly(gameScreen);
+    document.getElementById("logPanel").innerHTML = "";
+    renderBoard();
+    renderStatus();
+    setPileState(null);
+    logMsg(`Game started with ${players.length} players. ${players[0].name} goes first!`);
+    beginTurn();
+  });
+
+  // ================= ONLINE: CONNECT =================
+  const connectError = document.getElementById("connectError");
+  function makeRoomCode(){
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for(let i=0;i<4;i++) s += chars[Math.floor(Math.random()*chars.length)];
+    return s;
+  }
+
+  document.getElementById("createRoomBtn").addEventListener("click", async () => {
+    connectError.textContent = "";
+    if(!storageOk()){ connectError.textContent = "Online storage isn't available right now."; return; }
+    roomCode = makeRoomCode();
+    try{
+      await roomRef(roomCode).set({ started:false, players:[], seq:1 });
+      enterLobby();
+    } catch(e){
+      console.error("Sneaky Snake: create room failed —", e);
+      connectError.textContent = "Couldn't create a room. Try again.";
+    }
+  });
+
+  document.getElementById("joinRoomBtn").addEventListener("click", async () => {
+    connectError.textContent = "";
+    if(!storageOk()){ connectError.textContent = "Online storage isn't available right now."; return; }
+    const code = document.getElementById("joinCodeInput").value.trim().toUpperCase();
+    if(code.length !== 4){ connectError.textContent = "Enter the 4-character room code."; return; }
+    try{
+      const snap = await roomRef(code).get();
+      if(!snap.exists()){ connectError.textContent = "Room not found."; return; }
+      roomCode = code;
+      enterLobby();
+    } catch(e){
+      console.error("Sneaky Snake: join room failed —", e);
+      connectError.textContent = "Room not found.";
+    }
+  });
+
+  // ================= ONLINE: LOBBY =================
+  function enterLobby(){
+    document.getElementById("lobbyCode").textContent = roomCode;
+    mySeatIndex = -1;
+    document.getElementById("joinFormArea").classList.remove("hidden");
+    showOnly(lobbyScreen);
+
+    lobbyListenerRef = roomRef(roomCode);
+    lobbyListenerRef.on("value", onLobbySnapshot);
+  }
+
+  function onLobbySnapshot(snap){
+    const state = snap.val();
+    if(!state) return;
+
+    const list = document.getElementById("joinedList");
+    list.innerHTML = "";
+    (state.players || []).forEach(p => {
+      const item = document.createElement("div");
+      item.className = "joined-item";
+      const dot = document.createElement("div");
+      dot.className = "token-dot";
+      dot.style.background = p.color;
+      const label = document.createElement("span");
+      label.textContent = p.name;
+      item.appendChild(dot);
+      item.appendChild(label);
+      list.appendChild(item);
+    });
+
+    const startBtn = document.getElementById("lobbyStartBtn");
+    const count = (state.players || []).length;
+    startBtn.disabled = count < 2;
+    startBtn.textContent = count < 2 ? "Start Game (need 2+ players)" : `Start Game (${count} joined)`;
+
+    if(state.started){
+      if(lobbyListenerRef){ lobbyListenerRef.off("value", onLobbySnapshot); lobbyListenerRef = null; }
+      beginOnlineGameFromState(state);
+    }
+  }
+
+  let lobbyBoardRows = 8;
+  renderBoardSizeRow("lobbyBoardSizeRow", 8, (rows) => { lobbyBoardRows = rows; });
+
+  document.getElementById("lobbyJoinBtn").addEventListener("click", async () => {
+    const name = document.getElementById("lobbyNameInput").value.trim();
+    const lobbyError = document.getElementById("lobbyError");
+    lobbyError.textContent = "";
+    if(!name){ return; }
+    let assignedSeat = -1;
+    try{
+      // Use a transaction (atomic read-modify-write) instead of get()+set().
+      // Two people tapping "Join" at the same moment must not both be able to
+      // read the same players list and both claim the same seat index — a
+      // transaction guarantees Firebase reruns this function against the
+      // latest data if another write snuck in, so seats never collide.
+      const result = await roomRef(roomCode).transaction(state => {
+        if(!state || state.started) return; // room gone or already started — abort
+        state.players = state.players || [];
+        if(state.players.length >= 8) return; // room full — abort
+        assignedSeat = state.players.length;
+        state.players.push({ name, color: TOKEN_COLORS[assignedSeat], pos: 0 });
+        state.seq = (state.seq || 1) + 1;
+        return state;
+      });
+      if(!result.committed || assignedSeat === -1){
+        lobbyError.textContent = "Couldn't join — the room may be full or already started.";
+        return;
+      }
+      mySeatIndex = assignedSeat;
+      document.getElementById("joinFormArea").classList.add("hidden");
+    } catch(e){
+      lobbyError.textContent = "Couldn't join. Try again.";
+    }
+  });
+
+  document.getElementById("lobbyStartBtn").addEventListener("click", async () => {
+    try{
+      // Transaction here too: if someone else's join is committing at the
+      // exact moment the host hits Start, a plain get()+set() could start
+      // the game against a players list that's already stale, silently
+      // dropping that joiner (and leaving their device stuck waiting).
+      const board = (() => { configureBoardSize(lobbyBoardRows); return buildRandomBoard(); })();
+      const freshPileA = freshShuffledPile(PILE_A);
+      const freshPileB = freshShuffledPile(PILE_B);
+      await roomRef(roomCode).transaction(state => {
+        if(!state || !state.players || state.players.length < 2 || state.started) return;
+        state.board = board;
+        state.rows = lobbyBoardRows;
+        state.pileAOrder = encodePile(freshPileA, PILE_A);
+        state.pileBOrder = encodePile(freshPileB, PILE_B);
+        state.players = state.players.map(p => ({ name:p.name, color:p.color, pos:0 }));
+        state.currentIdx = 0;
+        state.gameOver = false;
+        state.winnerIdx = null;
+        state.started = true;
+        state.seq = (state.seq || 1) + 1;
+        return state;
+      });
+    } catch(e){ /* ignore */ }
+  });
+
+  document.getElementById("backFromLobbyBtn").addEventListener("click", () => {
+    if(lobbyListenerRef){ lobbyListenerRef.off("value", onLobbySnapshot); lobbyListenerRef = null; }
+    roomCode = null;
+    mySeatIndex = -1;
+    showOnly(modeScreen);
+  });
+
+  function beginOnlineGameFromState(state){
+    isOnlineMode = true;
+    configureBoardSize(state.board ? Math.round(state.board.length / COLS) : 8);
+    BOARD = state.board;
+    pileA = decodePile(state.pileAOrder, PILE_A);
+    pileB = decodePile(state.pileBOrder, PILE_B);
+    players = state.players.map(p => ({ ...p, isAI:false }));
+    currentIdx = state.currentIdx;
+    gameOver = state.gameOver;
+    lastKnownSeq = state.seq || 1;
+    myTurnRunning = false;
+
+    showOnly(gameScreen);
+    document.getElementById("logPanel").innerHTML = "";
+    renderBoard();
+    renderStatus();
+    setPileState(null);
+    logMsg(`Online game started with ${players.length} players.`);
+
+    if(currentIdx === mySeatIndex){
+      myTurnRunning = true;
+      beginTurn();
+    } else {
+      rollBtn.disabled = true;
+      setPrompt(players[currentIdx] ? `Waiting for ${players[currentIdx].name}...` : "Waiting...");
+    }
+
+    gameListenerRef = roomRef(roomCode);
+    gameListenerRef.on("value", onGameSnapshot);
+  }
+
+  function onGameSnapshot(snap){
+    if(!isOnlineMode || gameOver) return;
+    const state = snap.val();
+    if(!state) return;
+    if(typeof state.seq === "number" && state.seq <= lastKnownSeq) return;
+    lastKnownSeq = state.seq;
+    applyRemoteState(state);
+  }
+
+  async function applyRemoteState(state){
+    pileA = decodePile(state.pileAOrder, PILE_A);
+    pileB = decodePile(state.pileBOrder, PILE_B);
+
+    const oldPlayers = players;
+    const newPlayers = state.players.map(p => ({ ...p, isAI:false }));
+
+    if(!myTurnRunning){
+      for(let idx=0; idx<newPlayers.length; idx++){
+        if(idx === mySeatIndex) continue;
+        const oldPos = oldPlayers[idx] ? oldPlayers[idx].pos : 0;
+        const newPos = newPlayers[idx].pos;
+        if(oldPos !== newPos){
+          players = newPlayers;
+          await animateSteps(idx, oldPos, newPos);
+        }
+      }
+    }
+    players = newPlayers;
+    currentIdx = state.currentIdx;
+    gameOver = state.gameOver;
+    renderTokens();
+    renderStatus();
+
+    if(gameOver){
+      if(gameListenerRef){ gameListenerRef.off("value", onGameSnapshot); gameListenerRef = null; }
+      finishGame(state.winnerIdx);
+      return;
+    }
+
+    if(currentIdx === mySeatIndex && !myTurnRunning){
+      myTurnRunning = true;
+      beginTurn();
+    } else if(currentIdx !== mySeatIndex){
+      myTurnRunning = false;
+      rollBtn.disabled = true;
+      setPrompt(players[currentIdx] ? `Waiting for ${players[currentIdx].name}...` : "Waiting...");
+    }
+  }
+
+  async function pushOnlineState(){
+    if(!isOnlineMode || !roomCode) return;
+    const state = {
+      started: true,
+      board: BOARD,
+      pileAOrder: encodePile(pileA, PILE_A),
+      pileBOrder: encodePile(pileB, PILE_B),
+      players: players.map(p => ({ name:p.name, color:p.color, pos:p.pos })),
+      currentIdx: currentIdx,
+      gameOver: gameOver,
+      winnerIdx: gameOver ? currentIdx : null,
+      seq: lastKnownSeq + 1
+    };
+    try{
+      await roomRef(roomCode).set(state);
+      lastKnownSeq = state.seq;
+    } catch(e){ /* ignore transient errors, next push will retry with fresh data */ }
+  }
+
+  // ================= Board rendering (SVG snake) — shared by both modes =================
+  const boardInner = document.getElementById("boardInner");
+  let tokensLayerEl = null;
+
+  function renderBoard(){
+    let svg = `<svg viewBox="0 0 ${svgWidth} ${svgHeight}" width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg">`;
+
+    for(let r=0; r<ROWS-1; r++){
+      const side = (r % 2 === 0) ? "right" : "left";
+      const bulgeDir = side === "right" ? 1 : -1;
+      const xSide = side === "right" ? (marginX + L) : marginX;
+      const cy = rowCenterY(r) + R;
+      const Ro = R + trackWidth/2;
+      const Ri = Math.max(R - trackWidth/2, 4);
+      const d = elbowPathD(xSide, cy, Ro, Ri, bulgeDir);
+      svg += `<path d="${d}" fill="${COLOR_HEX.safe}" stroke="${COLOR_HEX.ink}" stroke-width="3" stroke-linejoin="round"/>`;
+    }
+
+    for(let i=0;i<BOARD_LENGTH;i++){
+      if(i === FINISH_INDEX) continue;
+      const { x, y } = cellCenter(i);
+      const rx = x - cellLen/2, ry = y - trackWidth/2;
+      const fill = COLOR_HEX[BOARD[i]] || COLOR_HEX.safe;
+      svg += `<rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${cellLen}" height="${trackWidth}" fill="${fill}" stroke="${COLOR_HEX.ink}" stroke-width="2"/>`;
+      svg += `<text x="${(rx+7).toFixed(1)}" y="${(ry+14).toFixed(1)}" font-family="Baloo 2, sans-serif" font-weight="800" font-size="11" fill="${COLOR_HEX.ink}" opacity="0.55">${i+1}</text>`;
+    }
+
+    const startC = cellCenter(0);
+    svg += `<text x="${startC.x}" y="${startC.y + trackWidth/2 + 13}" font-family="Patrick Hand, cursive" font-size="12" text-anchor="middle" fill="${COLOR_HEX.ink}" opacity="0.65">START</text>`;
+
+    const finC = cellCenter(FINISH_INDEX);
+    const finSide = physicalCol(FINISH_INDEX) === 0 ? -1 : 1;
+    const headW = cellLen * 1.15, headH = trackWidth * 1.3;
+    const headRx = finC.x - headW/2, headRy = finC.y - headH/2;
+    svg += `<rect x="${headRx.toFixed(1)}" y="${headRy.toFixed(1)}" width="${headW.toFixed(1)}" height="${headH.toFixed(1)}" rx="${(headH/2).toFixed(1)}" ry="${(headH/2).toFixed(1)}" fill="${COLOR_HEX.gold}" stroke="${COLOR_HEX.ink}" stroke-width="3"/>`;
+
+    const eyeOffsetX = 8, eyeOffsetY = 7;
+    svg += `<circle cx="${finC.x - eyeOffsetX}" cy="${finC.y - eyeOffsetY}" r="4.5" fill="#fff" stroke="${COLOR_HEX.ink}" stroke-width="1.3"/>`;
+    svg += `<circle cx="${finC.x + eyeOffsetX}" cy="${finC.y - eyeOffsetY}" r="4.5" fill="#fff" stroke="${COLOR_HEX.ink}" stroke-width="1.3"/>`;
+    svg += `<circle cx="${finC.x - eyeOffsetX}" cy="${finC.y - eyeOffsetY}" r="1.8" fill="${COLOR_HEX.ink}"/>`;
+    svg += `<circle cx="${finC.x + eyeOffsetX}" cy="${finC.y - eyeOffsetY}" r="1.8" fill="${COLOR_HEX.ink}"/>`;
+
+    const tongueBaseX = finC.x + finSide * (headW/2);
+    const stemLen = 9, prongLen = 8, prongSpread = 5;
+    const stemTipX = tongueBaseX + finSide * stemLen;
+    const prongTipX = stemTipX + finSide * prongLen;
+    svg += `<line x1="${tongueBaseX}" y1="${finC.y}" x2="${stemTipX}" y2="${finC.y}" stroke="#D6453A" stroke-width="3" stroke-linecap="round"/>`;
+    svg += `<line x1="${stemTipX}" y1="${finC.y}" x2="${prongTipX}" y2="${finC.y - prongSpread}" stroke="#D6453A" stroke-width="2.4" stroke-linecap="round"/>`;
+    svg += `<line x1="${stemTipX}" y1="${finC.y}" x2="${prongTipX}" y2="${finC.y + prongSpread}" stroke="#D6453A" stroke-width="2.4" stroke-linecap="round"/>`;
+
+    svg += `<text x="${finC.x}" y="${finC.y + headH/2 + 13}" font-family="Patrick Hand, cursive" font-size="12" text-anchor="middle" fill="${COLOR_HEX.ink}" opacity="0.7">END &middot; ${FINISH_INDEX+1}</text>`;
+
+    svg += `<g id="tokensLayer"></g>`;
+    svg += `</svg>`;
+
+    boardInner.innerHTML = svg;
+    tokensLayerEl = boardInner.querySelector("#tokensLayer");
+    renderTokens();
+  }
+
+  function renderTokens(){
+    if(!tokensLayerEl) return;
+    const grouped = {};
+    players.forEach((p, idx) => {
+      (grouped[p.pos] = grouped[p.pos] || []).push({p, idx});
+    });
+    let inner = "";
+    Object.keys(grouped).forEach(posKey => {
+      const group = grouped[posKey];
+      const { x, y } = cellCenter(Number(posKey));
+      const n = group.length;
+      group.forEach((entry, k) => {
+        const offsetX = (k - (n-1)/2) * 16;
+        const px = x + offsetX;
+        const py = y - 2;
+        inner += `<g>
+          <circle cx="${px}" cy="${py - 11}" r="7.5" fill="${entry.p.color}" stroke="${COLOR_HEX.ink}" stroke-width="1.8"/>
+          <rect x="${px-6}" y="${py-6}" width="12" height="13" rx="4" fill="${entry.p.color}" stroke="${COLOR_HEX.ink}" stroke-width="1.8"/>
+        </g>`;
+      });
+    });
+    tokensLayerEl.innerHTML = inner;
+  }
+
+  function renderStatus(){
+    const cur = players[currentIdx];
+    const turnNameEl = document.getElementById("turnName");
+    turnNameEl.textContent = cur ? (cur.name + (cur.isAI ? " 🤖" : "")) : "-";
+    turnNameEl.style.color = cur ? cur.color : "";
+
+    const strip = document.getElementById("positionsStrip");
+    strip.innerHTML = "";
+    players.forEach((p, idx) => {
+      const item = document.createElement("div");
+      item.className = "p-item";
+      const dot = document.createElement("div");
+      dot.className = "p-dot";
+      dot.style.background = p.color;
+      const label = document.createElement("span");
+      const posText = p.pos===0 ? "Start" : (p.pos===FINISH_INDEX ? "Finish" : p.pos);
+      const youTag = (isOnlineMode && idx === mySeatIndex) ? " (you)" : "";
+      label.textContent = `${p.name}${youTag}: ${posText}`;
+      item.appendChild(dot);
+      item.appendChild(label);
+      strip.appendChild(item);
+    });
+  }
+
+  const logPanel = document.getElementById("logPanel");
+  function logMsg(msg){
+    const line = document.createElement("div");
+    line.className = "fresh";
+    line.textContent = msg;
+    logPanel.prepend(line);
+    [...logPanel.children].forEach((c,idx)=>{ if(idx>0) c.classList.remove("fresh"); });
+  }
+
+  // ---------- Prompt bar ----------
+  const promptText = document.getElementById("promptText");
+  const nextTurnBtn = document.getElementById("nextTurnBtn");
+  function setPrompt(msg){ promptText.textContent = msg; }
+
+  let pendingNextTurnResolve = null;
+  nextTurnBtn.addEventListener("click", () => {
+    if(!pendingNextTurnResolve) return;
+    const fn = pendingNextTurnResolve;
+    pendingNextTurnResolve = null;
+    nextTurnBtn.classList.add("hidden");
+    fn();
+  });
+
+  function waitForNextTurnClick(player){
+    return new Promise(resolve => {
+      const autoAdvance = player.isAI || isOnlineMode;
+      setPrompt(`${player.name}'s turn is over.`);
+      if(autoAdvance){
+        nextTurnBtn.classList.add("hidden");
+        setTimeout(resolve, 700);
+      } else {
+        nextTurnBtn.classList.remove("hidden");
+        nextTurnBtn.textContent = "Next Turn ▶";
+        pendingNextTurnResolve = resolve;
+      }
+    });
+  }
+
+  // ---------- Pile click interaction ----------
+  const pileAWrap = document.getElementById("pileAWrap");
+  const pileBWrap = document.getElementById("pileBWrap");
+  const pileAHint = document.getElementById("pileAHint");
+  const pileBHint = document.getElementById("pileBHint");
+  const pileAStackEl = document.getElementById("pileAStack");
+  const pileBStackEl = document.getElementById("pileBStack");
+
+  let pendingPileResolve = null;
+
+  function setPileState(activeColor){
+    [ [pileAWrap, pileAHint, "A"], [pileBWrap, pileBHint, "B"] ].forEach(([wrap, hint, c]) => {
+      wrap.classList.remove("pile-active", "pile-inactive");
+      if(activeColor === c){
+        wrap.classList.add("pile-active");
+        hint.textContent = "Tap to draw!";
+      } else {
+        wrap.classList.add("pile-inactive");
+        hint.textContent = "";
+      }
+    });
+  }
+
+  function attemptPileClick(color){
+    if(!pendingPileResolve || pendingPileResolve.color !== color) return;
+    const fn = pendingPileResolve.resolve;
+    pendingPileResolve = null;
+    setPileState(null);
+    fn();
+  }
+  pileAWrap.addEventListener("click", () => attemptPileClick("A"));
+  pileBWrap.addEventListener("click", () => attemptPileClick("B"));
+
+  function waitForPileClick(color, player){
+    return new Promise(resolve => {
+      setPrompt(`${player.name}: tap Pile ${color} to draw a card!`);
+      setPileState(color);
+      if(player.isAI){
+        setTimeout(() => { setPileState(null); resolve(); }, 750);
+      } else {
+        pendingPileResolve = { color, resolve };
+      }
+    });
+  }
+
+  // ---------- Flying card animation ----------
+  function flyCard(fromRect, toRect, bg, duration){
+    duration = duration || 380;
+    return new Promise(resolve => {
+      const el = document.createElement("div");
+      el.className = "flying-card";
+      el.style.left = fromRect.left + "px";
+      el.style.top = fromRect.top + "px";
+      el.style.width = fromRect.width + "px";
+      el.style.height = fromRect.height + "px";
+      el.style.background = bg;
+      el.style.transition = `left ${duration}ms ease, top ${duration}ms ease, width ${duration}ms ease, height ${duration}ms ease`;
+      document.body.appendChild(el);
+      el.getBoundingClientRect();
+      requestAnimationFrame(() => {
+        el.style.left = toRect.left + "px";
+        el.style.top = toRect.top + "px";
+        el.style.width = toRect.width + "px";
+        el.style.height = toRect.height + "px";
+      });
+      setTimeout(() => { el.remove(); resolve(); }, duration + 30);
+    });
+  }
+
+  function centerCardRect(){
+    const w = 132, h = 92;
+    return { left: window.innerWidth/2 - w/2, top: window.innerHeight/2 - h/2 - 30, width: w, height: h };
+  }
+
+  // ---------- Dice / turn engine (runs only on the acting player's device) ----------
+  const rollBtn = document.getElementById("rollBtn");
+  const dieFace = document.getElementById("dieFace");
+
+  rollBtn.addEventListener("click", () => {
+    if(gameOver || rollBtn.disabled) return;
+    if(players[currentIdx].isAI) return;
+    performRoll(currentIdx);
+  });
+
+  function beginTurn(){
+    if(gameOver) return;
+    const player = players[currentIdx];
+    dieFace.textContent = "🎲";
+    if(player.isAI){
+      setPrompt(`${player.name} 🤖 is about to roll...`);
+      rollBtn.disabled = true;
+      setTimeout(() => { performRoll(currentIdx); }, 800);
+    } else {
+      setPrompt(`${player.name}: tap "Roll the Die"!`);
+      rollBtn.disabled = false;
+    }
+  }
+
+  async function performRoll(playerIdx){
+    rollBtn.disabled = true;
+    playDiceSound();
+    const roll = 1 + Math.floor(Math.random()*6);
+    dieFace.textContent = roll;
+    logMsg(`${players[playerIdx].name} rolled a ${roll}.`);
+    setPrompt(`${players[playerIdx].name} moves ${roll}...`);
+    await movePlayer(playerIdx, roll);
+  }
+
+  async function animateSteps(playerIdx, start, target){
+    const dir = target > start ? 1 : -1;
+    let pos = start;
+    while(pos !== target){
+      await wait(STEP_MS);
+      pos += dir;
+      players[playerIdx].pos = pos;
+      renderTokens();
+      renderStatus();
+    }
+  }
+
+  async function movePlayer(playerIdx, delta){
+    const player = players[playerIdx];
+    const start = player.pos;
+    let target = start + delta;
+
+    if(delta > 0 && target > FINISH_INDEX){
+      logMsg(`${player.name} needs an exact roll to finish — no move this time.`);
+      await wait(500);
+      await endTurnFlow(playerIdx);
+      return;
+    }
+    target = clampBackward(target);
+
+    await animateSteps(playerIdx, start, target);
+    player.pos = target;
+    renderTokens();
+    renderStatus();
+    if(isOnlineMode) await pushOnlineState();
+
+    if(target === FINISH_INDEX){
+      finishGame(playerIdx);
+      if(isOnlineMode) await pushOnlineState();
+      return;
+    }
+    await resolveSquare(playerIdx);
+  }
+
+  async function resolveSquare(playerIdx){
+    const player = players[playerIdx];
+    const color = BOARD[player.pos];
+    if(color === "safe"){
+      logMsg(`${player.name} landed on a safe square.`);
+      await endTurnFlow(playerIdx);
+      return;
+    }
+
+    await waitForPileClick(color, player);
+
+    const pile = color === "A" ? pileA : pileB;
+    const stackEl = color === "A" ? pileAStackEl : pileBStackEl;
+    const bg = color === "A" ? "var(--pileA-color)" : "var(--pileB-color)";
+    const card = pile.shift();
+    pile.push(card);
+
+    const stackRect = stackEl.getBoundingClientRect();
+    const centerRect = centerCardRect();
+    await flyCard(stackRect, centerRect, bg);
+
+    if(card.type === "swap"){
+      await handleSwapCard(card, playerIdx, stackEl, bg, centerRect);
+      return;
+    }
+
+    await showCardForApply(color, card, player);
+    await flyCard(centerRect, stackEl.getBoundingClientRect(), bg);
+    await applyCard(card, playerIdx);
+  }
+
+  function showCardForApply(pileLetter, card, player){
+    return new Promise(resolve => {
+      cardPileTag.textContent = "Pile " + pileLetter;
+      cardPileTag.className = "pile-tag " + pileLetter;
+      cardText.textContent = card.text;
+      swapArea.innerHTML = "";
+      cardOverlay.classList.remove("hidden");
+      setPrompt(`${player.name}: see what the card says!`);
+
+      if(player.isAI){
+        cardOkBtn.classList.add("hidden");
+        setTimeout(() => { cardOverlay.classList.add("hidden"); resolve(); }, 950);
+      } else {
+        cardOkBtn.classList.remove("hidden");
+        cardOkBtn.textContent = "Do it!";
+        cardOkBtn.onclick = () => { cardOverlay.classList.add("hidden"); resolve(); };
+      }
+    });
+  }
+
+  async function applyCard(card, playerIdx){
+    const player = players[playerIdx];
+    if(card.type === "stay"){
+      playStaySound();
+      logMsg(`${player.name} stays put.`);
+      await endTurnFlow(playerIdx);
+      return;
+    }
+    if(card.type === "forward"){
+      playForwardSound();
+      logMsg(`${player.name} moves forward ${card.value}.`);
+      setPrompt(`${player.name} moves forward ${card.value}...`);
+      await movePlayer(playerIdx, card.value);
+      return;
+    }
+    if(card.type === "backward"){
+      playBackwardSound();
+      logMsg(`${player.name} moves backward ${card.value}.`);
+      setPrompt(`${player.name} moves backward ${card.value}...`);
+      await movePlayer(playerIdx, -card.value);
+      return;
+    }
+  }
+
+  function handleSwapCard(card, playerIdx, stackEl, bg, centerRect){
+    return new Promise(resolveOuter => {
+      const player = players[playerIdx];
+      cardPileTag.textContent = "Pile B";
+      cardPileTag.className = "pile-tag B";
+      cardText.textContent = card.text;
+      cardOkBtn.classList.add("hidden");
+      swapArea.innerHTML = "";
+      cardOverlay.classList.remove("hidden");
+
+      const finishSwap = async (chosenIdx) => {
+        cardOverlay.classList.add("hidden");
+        await flyCard(centerRect, stackEl.getBoundingClientRect(), bg);
+
+        const other = players[chosenIdx];
+        const myPos = player.pos;
+        player.pos = other.pos;
+        other.pos = myPos;
+        renderTokens();
+        renderStatus();
+        if(isOnlineMode) await pushOnlineState();
+        logMsg(`${player.name} swapped places with ${other.name}.`);
+        if(player.pos === FINISH_INDEX){
+          finishGame(playerIdx);
+          if(isOnlineMode) await pushOnlineState();
+          resolveOuter();
+          return;
+        }
+        await resolveSquare(playerIdx);
+        resolveOuter();
+      };
+
+      if(player.isAI){
+        setPrompt(`${player.name} 🤖 is choosing someone to swap with...`);
+        setTimeout(() => {
+          const others = players.map((_,i)=>i).filter(i=>i!==playerIdx);
+          finishSwap(others[Math.floor(Math.random()*others.length)]);
+        }, 900);
+      } else {
+        setPrompt(`${player.name}: choose a player to swap with!`);
+        const list = document.createElement("div");
+        list.className = "swap-list";
+        players.forEach((p, idx) => {
+          if(idx === playerIdx) return;
+          const choice = document.createElement("div");
+          choice.className = "swap-choice";
+          choice.textContent = "Swap with " + p.name;
+          choice.addEventListener("click", () => finishSwap(idx));
+          list.appendChild(choice);
+        });
+        swapArea.appendChild(list);
+      }
+    });
+  }
+
+  async function endTurnFlow(playerIdx){
+    const player = players[playerIdx];
+    await waitForNextTurnClick(player);
+    currentIdx = (currentIdx + 1) % players.length;
+    renderStatus();
+    if(isOnlineMode){
+      myTurnRunning = false;
+      await pushOnlineState();
+      rollBtn.disabled = true;
+      setPrompt(players[currentIdx] ? `Waiting for ${players[currentIdx].name}...` : "Waiting...");
+    } else {
+      beginTurn();
+    }
+  }
+
+  // ---------- Card modal refs ----------
+  const cardOverlay = document.getElementById("cardOverlay");
+  const cardPileTag = document.getElementById("cardPileTag");
+  const cardText = document.getElementById("cardText");
+  const cardOkBtn = document.getElementById("cardOkBtn");
+  const swapArea = document.getElementById("swapArea");
+
+  // ---------- Win ----------
+  const winOverlay = document.getElementById("winOverlay");
+  const winText = document.getElementById("winText");
+
+  function finishGame(playerIdx){
+    gameOver = true;
+    playWinSound();
+    renderStatus();
+    setPrompt(`${players[playerIdx].name} wins!`);
+    winText.textContent = `🎉 ${players[playerIdx].name} wins! 🎉`;
+    winOverlay.classList.remove("hidden");
+    logMsg(`${players[playerIdx].name} landed exactly on the finish and won!`);
+    if(gameListenerRef){ gameListenerRef.off("value", onGameSnapshot); gameListenerRef = null; }
+  }
+
+  document.getElementById("playAgainBtn").addEventListener("click", () => {
+    winOverlay.classList.add("hidden");
+    goHome();
+  });
+
+  // ---------- Help modal ----------
+  const helpOverlay = document.getElementById("helpOverlay");
+  document.querySelectorAll(".help-trigger").forEach(btn => {
+    btn.addEventListener("click", () => { helpOverlay.classList.remove("hidden"); });
+  });
+  document.getElementById("helpOkBtn").addEventListener("click", () => {
+    helpOverlay.classList.add("hidden");
+  });
+
+  // ---------- Quit ----------
+  const quitOverlay = document.getElementById("quitOverlay");
+  document.getElementById("quitBtn").addEventListener("click", () => {
+    quitOverlay.classList.remove("hidden");
+  });
+  document.getElementById("quitNoBtn").addEventListener("click", () => {
+    quitOverlay.classList.add("hidden");
+  });
+  document.getElementById("quitYesBtn").addEventListener("click", () => {
+    quitOverlay.classList.add("hidden");
+    goHome();
+  });
+
+  function goHome(){
+    gameOver = true;
+    pendingPileResolve = null;
+    pendingNextTurnResolve = null;
+    if(gameListenerRef){ gameListenerRef.off("value", onGameSnapshot); gameListenerRef = null; }
+    if(lobbyListenerRef){ lobbyListenerRef.off("value", onLobbySnapshot); lobbyListenerRef = null; }
+    isOnlineMode = false;
+    roomCode = null;
+    mySeatIndex = -1;
+    showOnly(modeScreen);
+    document.getElementById("logPanel").innerHTML = "";
+    cardOverlay.classList.add("hidden");
+    winOverlay.classList.add("hidden");
+    nextTurnBtn.classList.add("hidden");
+    setPileState(null);
+  }
+
+})();
+</script>
+</body>
+</html>
