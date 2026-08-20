@@ -191,7 +191,16 @@
   /* ---------- Modals ---------- */
   .overlay { position:fixed; inset:0; background:rgba(43,35,32,0.55); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px; }
   .modal { background:#fff; border:3px solid var(--ink); border-radius:18px; padding:26px; max-width:400px; width:100%; text-align:center; box-shadow:8px 8px 0 rgba(0,0,0,0.2); }
-  .modal.help-modal { max-width: 460px; text-align:left; max-height: 82vh; overflow-y:auto; }
+  .modal.help-modal {
+  max-width: 460px;
+  width: 100%;
+  height: 82vh;
+  max-height: 82vh;
+  text-align: left;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
   .modal.help-modal h3 { font-family:'Patrick Hand', cursive; font-size:1.4rem; margin:14px 0 6px; color: var(--purple-dark); }
   .modal.help-modal p { margin: 4px 0; line-height:1.4; font-size:0.95rem; }
 
