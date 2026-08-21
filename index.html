@@ -106,6 +106,25 @@
   .mode-btn:hover { transform: translate(-2px,-2px); box-shadow:6px 6px 0 rgba(0,0,0,0.1); }
   .mode-btn .sub { display:block; font-family:'Baloo 2', sans-serif; font-size:0.85rem; opacity:0.65; margin-top:2px; }
 
+  .account-bar { max-width:560px; margin:0 auto 14px; display:flex; justify-content:center; align-items:center; }
+  .account-link {
+    background:none; border:none; cursor:pointer; font-family:'Baloo 2', sans-serif;
+    font-weight:700; font-size:0.95rem; color:var(--purple-dark); padding:6px 4px;
+  }
+  .account-link .sub-inline { opacity:0.6; font-weight:400; }
+  .account-loggedin { display:flex; align-items:center; gap:6px; }
+  .icon-btn.small { width:32px; height:32px; font-size:0.95rem; }
+  .auth-tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .auth-tab {
+    flex:1; padding:10px; border:2px solid var(--ink); border-radius:10px; background:#eee;
+    font-family:'Patrick Hand', cursive; font-size:1.1rem; cursor:pointer;
+  }
+  .auth-tab.active { background:var(--purple); color:#fff; }
+  .stats-history-item {
+    display:flex; justify-content:space-between; padding:6px 8px; border-bottom:1px solid #eee;
+    font-family:'Baloo 2', sans-serif; font-size:0.9rem;
+  }
+
   .room-code-display {
     text-align:center; font-family:'Patrick Hand', cursive; font-size:2.2rem;
     letter-spacing:6px; color: var(--purple-dark); background: var(--pink);
@@ -191,16 +210,7 @@
   /* ---------- Modals ---------- */
   .overlay { position:fixed; inset:0; background:rgba(43,35,32,0.55); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px; }
   .modal { background:#fff; border:3px solid var(--ink); border-radius:18px; padding:26px; max-width:400px; width:100%; text-align:center; box-shadow:8px 8px 0 rgba(0,0,0,0.2); }
-  .modal.help-modal {
-  max-width: 460px;
-  width: 100%;
-  height: 82vh;
-  max-height: 82vh;
-  text-align: left;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-}
+  .modal.help-modal { max-width: 460px; text-align:left; max-height: 82vh; overflow-y:auto; }
   .modal.help-modal h3 { font-family:'Patrick Hand', cursive; font-size:1.4rem; margin:14px 0 6px; color: var(--purple-dark); }
   .modal.help-modal p { margin: 4px 0; line-height:1.4; font-size:0.95rem; }
 
@@ -224,6 +234,15 @@
 <div class="app">
   <h1 class="title">Sneaky <span>Snake</span></h1>
   <div class="subtitle" id="subtitleText">First to land exactly on the end wins!</div>
+
+  <!-- ACCOUNT BAR -->
+  <div class="account-bar" id="accountBar">
+    <button class="account-link" id="loginPromptBtn">👤 Log In / Sign Up <span class="sub-inline">(optional)</span></button>
+    <div class="account-loggedin hidden" id="accountLoggedIn">
+      <button class="account-link" id="viewStatsBtn">👋 Hi, <span id="accountNameLabel"></span> &middot; My Stats</button>
+      <button class="account-link" id="logoutBtn">Log Out</button>
+    </div>
+  </div>
 
   <!-- MODE SELECT -->
   <div id="modeScreen" class="card-panel">
@@ -289,14 +308,18 @@
 
   <!-- ONLINE LOBBY SCREEN -->
   <div id="lobbyScreen" class="card-panel hidden">
-    <label class="field-label">Room code — share this with friends</label>
-    <div class="room-code-display" id="lobbyCode">----</div>
+    <div id="lobbyRoomCodeArea">
+      <label class="field-label">Room code — share this with friends</label>
+      <div class="room-code-display" id="lobbyCode">----</div>
+    </div>
 
     <label class="field-label">Players joined</label>
     <div class="joined-list" id="joinedList"></div>
 
-    <label class="field-label">Board size</label>
-    <div class="count-row" id="lobbyBoardSizeRow"></div>
+    <div id="lobbyBoardSizeArea">
+      <label class="field-label">Board size</label>
+      <div class="count-row" id="lobbyBoardSizeRow"></div>
+    </div>
 
     <div id="joinFormArea">
       <input class="name-input" id="lobbyNameInput" placeholder="Your name" maxlength="16" style="margin-bottom:10px;">
@@ -400,6 +423,8 @@
     <p>Choose "Play with Bots" from the home screen to play solo against one or more computer opponents — they roll, draw cards, and move automatically.</p>
     <h3>🌐 Online mode</h3>
     <p>Each player joins from their own device with a room code. Only the current player's device is interactive — everyone else just watches until it's their turn.</p>
+    <h3>👤 Accounts</h3>
+    <p>Logging in is optional — it just remembers your username on this device and keeps a tally of how many games you've played and when.</p>
     <h3>🔊 Sound</h3>
     <p>Tap the speaker icon during a game to mute or unmute the music and sound effects.</p>
     <h3>🏠 Quitting</h3>
@@ -415,6 +440,38 @@
       <button class="big-btn secondary" id="quitNoBtn">Cancel</button>
       <button class="big-btn" id="quitYesBtn">Yes, quit</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="authOverlay">
+  <div class="modal">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="authTabLogin">Log In</button>
+      <button class="auth-tab" id="authTabSignup">Sign Up</button>
+    </div>
+    <label class="field-label">Username</label>
+    <input class="name-input" id="authUsernameInput" placeholder="Username" maxlength="16" style="margin-bottom:10px;">
+    <label class="field-label">Password</label>
+    <input class="name-input" type="password" id="authPasswordInput" placeholder="Password" maxlength="64" style="margin-bottom:10px;">
+    <div id="authConfirmArea" class="hidden">
+      <label class="field-label">Confirm password</label>
+      <input class="name-input" type="password" id="authConfirmInput" placeholder="Confirm password" maxlength="64" style="margin-bottom:10px;">
+    </div>
+    <div class="error-text" id="authError"></div>
+    <button class="big-btn" id="authSubmitBtn">Log In</button>
+    <button class="big-btn secondary" id="authCancelBtn">Cancel</button>
+    <div class="notice-text" style="margin-top:10px; font-size:0.85rem;">This is a simple account just for tracking your game stats on this site — use a password you don't use anywhere important.</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="statsOverlay">
+  <div class="modal">
+    <div class="card-text" style="font-size:1.4rem;" id="statsTitle">Your stats</div>
+    <div class="notice-text" id="statsGamesPlayed" style="margin:8px 0;"></div>
+    <label class="field-label">Recent games</label>
+    <div id="statsHistoryList" style="max-height:200px; overflow-y:auto; margin-bottom:14px;"></div>
+    <button class="big-btn secondary" id="statsCloseBtn">Close</button>
+    <button class="big-btn secondary" id="statsLogoutBtn" style="margin-top:8px;">Log out</button>
   </div>
 </div>
 
@@ -566,6 +623,7 @@
 
   // Online-mode state
   let isOnlineMode = false;
+  let gameMode = "local"; // "local" | "bot" | "online" — used for account stat tracking
   let roomCode = null;
   let mySeatIndex = -1;
   let lastKnownSeq = 0;
@@ -597,6 +655,208 @@
   }
 
   function storageOk(){ return fbOk; }
+
+  // ================= ACCOUNTS (optional login) =================
+  // A lightweight, low-stakes account system just for remembering a
+  // username and tallying games played on this device/site. This is not
+  // bank-grade security — passwords are salted + SHA-256 hashed before
+  // ever being written anywhere, but there's no server-side session
+  // token, just a locally-remembered login. Fine for a casual game,
+  // not for anything sensitive (hence the note on the login screen).
+  let currentUser = null; // { key, username }
+
+  function cryptoOk(){ return !!(window.crypto && window.crypto.subtle); }
+  function usersRef(key){ return fbDb.ref("users/" + key); }
+  function usernameToKey(name){ return name.trim().toLowerCase().replace(/[^a-z0-9_]/g, ""); }
+
+  async function sha256Hex(text){
+    const enc = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest("SHA-256", enc);
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+  function randomSalt(){
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    return [...arr].map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+
+  function updateAccountBar(){
+    const loginBtn = document.getElementById("loginPromptBtn");
+    const loggedInBox = document.getElementById("accountLoggedIn");
+    if(currentUser){
+      loginBtn.classList.add("hidden");
+      loggedInBox.classList.remove("hidden");
+      document.getElementById("accountNameLabel").textContent = currentUser.username;
+    } else {
+      loginBtn.classList.remove("hidden");
+      loggedInBox.classList.add("hidden");
+    }
+  }
+
+  function rememberUser(user){
+    currentUser = user;
+    try{ localStorage.setItem("sneakySnakeUser", JSON.stringify(user)); } catch(e){ /* ignore */ }
+    updateAccountBar();
+  }
+  function forgetUser(){
+    currentUser = null;
+    try{ localStorage.removeItem("sneakySnakeUser"); } catch(e){ /* ignore */ }
+    updateAccountBar();
+  }
+  (function loadRememberedUser(){
+    try{
+      const raw = localStorage.getItem("sneakySnakeUser");
+      if(!raw) return;
+      const saved = JSON.parse(raw);
+      if(saved && saved.key && saved.username){ currentUser = saved; updateAccountBar(); }
+    } catch(e){ /* ignore corrupt/unavailable storage */ }
+  })();
+
+  // Records a completed game's result (win/loss) for whoever is logged in
+  // on this device, once the game actually finishes. Scoped to Bot mode and
+  // Online mode only — in Local pass-and-play, several humans usually share
+  // one device, so there's no single reliable "you" to attribute a result
+  // to. gameMode is set by each of the three game-start flows.
+  async function recordGameResult(winnerIdx){
+    if(!currentUser || !storageOk()) return;
+    let won;
+    if(gameMode === "bot"){
+      won = (winnerIdx === 0); // you're always seat 0 in Bot mode
+    } else if(gameMode === "online"){
+      if(mySeatIndex < 0) return;
+      won = (winnerIdx === mySeatIndex);
+    } else {
+      return; // local pass-and-play — not tracked, see note above
+    }
+    try{
+      const nowIso = new Date().toISOString();
+      await usersRef(currentUser.key).transaction(data => {
+        if(!data) return data; // account vanished server-side — don't recreate here
+        data.gamesPlayed = (data.gamesPlayed || 0) + 1;
+        data.history = data.history || [];
+        data.history.push({ ts: nowIso, result: won ? "win" : "loss" });
+        if(data.history.length > 20) data.history = data.history.slice(-20);
+        return data;
+      });
+    } catch(e){ console.error("Sneaky Snake: couldn't record game result —", e); }
+  }
+
+  // ---- Auth overlay ----
+  const authOverlay = document.getElementById("authOverlay");
+  const authError = document.getElementById("authError");
+  let authMode = "login";
+
+  function setAuthMode(mode){
+    authMode = mode;
+    authError.textContent = "";
+    document.getElementById("authTabLogin").classList.toggle("active", mode === "login");
+    document.getElementById("authTabSignup").classList.toggle("active", mode === "signup");
+    document.getElementById("authConfirmArea").classList.toggle("hidden", mode !== "signup");
+    document.getElementById("authSubmitBtn").textContent = mode === "signup" ? "Sign Up" : "Log In";
+  }
+
+  document.getElementById("loginPromptBtn").addEventListener("click", () => {
+    authError.textContent = "";
+    document.getElementById("authUsernameInput").value = "";
+    document.getElementById("authPasswordInput").value = "";
+    document.getElementById("authConfirmInput").value = "";
+    setAuthMode("login");
+    authOverlay.classList.remove("hidden");
+  });
+  document.getElementById("authTabLogin").addEventListener("click", () => setAuthMode("login"));
+  document.getElementById("authTabSignup").addEventListener("click", () => setAuthMode("signup"));
+  document.getElementById("authCancelBtn").addEventListener("click", () => authOverlay.classList.add("hidden"));
+
+  document.getElementById("authSubmitBtn").addEventListener("click", async () => {
+    authError.textContent = "";
+    if(!storageOk()){ authError.textContent = "Online storage isn't available right now."; return; }
+    if(!cryptoOk()){ authError.textContent = "Accounts need a secure (https) connection to work in this browser."; return; }
+    const rawName = document.getElementById("authUsernameInput").value;
+    const password = document.getElementById("authPasswordInput").value;
+    const key = usernameToKey(rawName);
+    if(key.length < 3){ authError.textContent = "Username needs at least 3 letters/numbers."; return; }
+    if(password.length < 4){ authError.textContent = "Password needs at least 4 characters."; return; }
+
+    if(authMode === "signup"){
+      const confirmPass = document.getElementById("authConfirmInput").value;
+      if(password !== confirmPass){ authError.textContent = "Passwords don't match."; return; }
+      try{
+        const salt = randomSalt();
+        const passHash = await sha256Hex(salt + password);
+        let taken = false;
+        const result = await usersRef(key).transaction(existing => {
+          if(existing){ taken = true; return; }
+          return { username: rawName.trim(), salt, passHash, gamesPlayed: 0, history: [], createdAt: new Date().toISOString() };
+        });
+        if(taken || !result.committed){ authError.textContent = "That username is already taken."; return; }
+        authOverlay.classList.add("hidden");
+        rememberUser({ key, username: rawName.trim() });
+      } catch(e){
+        console.error("Sneaky Snake: signup failed —", e);
+        authError.textContent = "Couldn't create account. Try again.";
+      }
+    } else {
+      try{
+        const snap = await usersRef(key).get();
+        const data = snap.val();
+        if(!data){ authError.textContent = "No account with that username."; return; }
+        const hash = await sha256Hex(data.salt + password);
+        if(hash !== data.passHash){ authError.textContent = "Incorrect password."; return; }
+        authOverlay.classList.add("hidden");
+        rememberUser({ key, username: data.username });
+      } catch(e){
+        console.error("Sneaky Snake: login failed —", e);
+        authError.textContent = "Couldn't log in. Try again.";
+      }
+    }
+  });
+
+  // ---- Stats overlay ----
+  const statsOverlay = document.getElementById("statsOverlay");
+  document.getElementById("viewStatsBtn").addEventListener("click", async () => {
+    if(!currentUser) return;
+    document.getElementById("statsTitle").textContent = currentUser.username + "'s stats";
+    document.getElementById("statsGamesPlayed").textContent = "Loading...";
+    document.getElementById("statsHistoryList").innerHTML = "";
+    statsOverlay.classList.remove("hidden");
+    if(!storageOk()){ document.getElementById("statsGamesPlayed").textContent = "Online storage isn't available right now."; return; }
+    try{
+      const snap = await usersRef(currentUser.key).get();
+      const data = snap.val() || {};
+      document.getElementById("statsGamesPlayed").textContent = `${data.gamesPlayed || 0} games played`;
+      const list = document.getElementById("statsHistoryList");
+      const history = (data.history || []).slice().reverse();
+      if(history.length === 0){
+        list.innerHTML = `<div class="stats-history-item">No games yet — go play one!</div>`;
+      } else {
+        history.forEach(entry => {
+          // Older entries (from before win/loss tracking) are plain ISO
+          // strings; newer ones are {ts, result} objects — handle both.
+          const iso = typeof entry === "string" ? entry : entry.ts;
+          const result = typeof entry === "string" ? null : entry.result;
+          const row = document.createElement("div");
+          row.className = "stats-history-item";
+          const dateSpan = document.createElement("span");
+          dateSpan.textContent = new Date(iso).toLocaleString(undefined, { dateStyle:"medium", timeStyle:"short" });
+          row.appendChild(dateSpan);
+          if(result){
+            const badge = document.createElement("span");
+            badge.textContent = result === "win" ? "🏆 Win" : "Loss";
+            badge.style.fontWeight = "700";
+            badge.style.color = result === "win" ? "var(--pileA-color-dark)" : "#B03A2E";
+            row.appendChild(badge);
+          }
+          list.appendChild(row);
+        });
+      }
+    } catch(e){
+      console.error("Sneaky Snake: couldn't load stats —", e);
+      document.getElementById("statsGamesPlayed").textContent = "Couldn't load stats right now.";
+    }
+  });
+  document.getElementById("statsCloseBtn").addEventListener("click", () => statsOverlay.classList.add("hidden"));
+  document.getElementById("statsLogoutBtn").addEventListener("click", () => { forgetUser(); statsOverlay.classList.add("hidden"); });
+  document.getElementById("logoutBtn").addEventListener("click", () => forgetUser());
 
   // ================= SOUND (synthesized — no external audio files) =================
   let audioCtx = null;
@@ -743,6 +1003,7 @@
     }
     showOnly(onlineConnectScreen);
   });
+
   document.getElementById("backFromConnectBtn").addEventListener("click", () => showOnly(modeScreen));
 
   // ================= Board size selector (shared helper) =================
@@ -809,6 +1070,7 @@
 
   document.getElementById("startBtn").addEventListener("click", () => {
     isOnlineMode = false;
+    gameMode = "local";
     players = [];
     for(let i=0;i<numPlayers;i++){
       const val = document.getElementById("nameInput"+i).value.trim();
@@ -853,6 +1115,7 @@
 
   document.getElementById("startBotBtn").addEventListener("click", () => {
     isOnlineMode = false;
+    gameMode = "bot";
     const yourName = document.getElementById("botYourNameInput").value.trim();
     players = [{ name: yourName || "Player 1", pos: 0, color: TOKEN_COLORS[0], isAI: false }];
     for(let i=0;i<botCount;i++){
@@ -912,10 +1175,14 @@
   });
 
   // ================= ONLINE: LOBBY =================
-  function enterLobby(){
+  function enterLobby(alreadyJoined){
     document.getElementById("lobbyCode").textContent = roomCode;
-    mySeatIndex = -1;
-    document.getElementById("joinFormArea").classList.remove("hidden");
+    if(alreadyJoined){
+      document.getElementById("joinFormArea").classList.add("hidden");
+    } else {
+      mySeatIndex = -1;
+      document.getElementById("joinFormArea").classList.remove("hidden");
+    }
     showOnly(lobbyScreen);
 
     lobbyListenerRef = roomRef(roomCode);
@@ -955,11 +1222,7 @@
   let lobbyBoardRows = 8;
   renderBoardSizeRow("lobbyBoardSizeRow", 8, (rows) => { lobbyBoardRows = rows; });
 
-  document.getElementById("lobbyJoinBtn").addEventListener("click", async () => {
-    const name = document.getElementById("lobbyNameInput").value.trim();
-    const lobbyError = document.getElementById("lobbyError");
-    lobbyError.textContent = "";
-    if(!name){ return; }
+  async function joinLobbyAs(name){
     let assignedSeat = -1;
     try{
       // Use a transaction (atomic read-modify-write) instead of get()+set().
@@ -977,29 +1240,46 @@
         return state;
       });
       if(!result.committed || assignedSeat === -1){
-        lobbyError.textContent = "Couldn't join — the room may be full or already started.";
-        return;
+        return { ok:false, reason:"full_or_started" };
       }
       mySeatIndex = assignedSeat;
-      document.getElementById("joinFormArea").classList.add("hidden");
+      return { ok:true };
     } catch(e){
-      lobbyError.textContent = "Couldn't join. Try again.";
+      console.error("Sneaky Snake: join failed —", e);
+      return { ok:false, reason:"error" };
     }
+  }
+
+  document.getElementById("lobbyJoinBtn").addEventListener("click", async () => {
+    const name = document.getElementById("lobbyNameInput").value.trim();
+    const lobbyError = document.getElementById("lobbyError");
+    lobbyError.textContent = "";
+    if(!name){ return; }
+    const result = await joinLobbyAs(name);
+    if(!result.ok){
+      lobbyError.textContent = "Couldn't join — the room may be full or already started.";
+      return;
+    }
+    document.getElementById("joinFormArea").classList.add("hidden");
   });
 
-  document.getElementById("lobbyStartBtn").addEventListener("click", async () => {
+  async function startOnlineGame(rows){
     try{
       // Transaction here too: if someone else's join is committing at the
-      // exact moment the host hits Start, a plain get()+set() could start
+      // exact moment start is triggered, a plain get()+set() could start
       // the game against a players list that's already stale, silently
       // dropping that joiner (and leaving their device stuck waiting).
-      const board = (() => { configureBoardSize(lobbyBoardRows); return buildRandomBoard(); })();
+      // It's also safe for multiple clients to call this at once (e.g.
+      // quick-match auto-start firing on more than one device) — only the
+      // first transaction to commit wins; the rest see state.started
+      // already true and abort harmlessly.
+      const board = (() => { configureBoardSize(rows); return buildRandomBoard(); })();
       const freshPileA = freshShuffledPile(PILE_A);
       const freshPileB = freshShuffledPile(PILE_B);
       await roomRef(roomCode).transaction(state => {
         if(!state || !state.players || state.players.length < 2 || state.started) return;
         state.board = board;
-        state.rows = lobbyBoardRows;
+        state.rows = rows;
         state.pileAOrder = encodePile(freshPileA, PILE_A);
         state.pileBOrder = encodePile(freshPileB, PILE_B);
         state.players = state.players.map(p => ({ name:p.name, color:p.color, pos:0 }));
@@ -1011,6 +1291,10 @@
         return state;
       });
     } catch(e){ /* ignore */ }
+  }
+
+  document.getElementById("lobbyStartBtn").addEventListener("click", async () => {
+    await startOnlineGame(lobbyBoardRows);
   });
 
   document.getElementById("backFromLobbyBtn").addEventListener("click", () => {
@@ -1022,6 +1306,7 @@
 
   function beginOnlineGameFromState(state){
     isOnlineMode = true;
+    gameMode = "online";
     configureBoardSize(state.board ? Math.round(state.board.length / COLS) : 8);
     BOARD = state.board;
     pileA = decodePile(state.pileAOrder, PILE_A);
@@ -1577,6 +1862,7 @@
     winOverlay.classList.remove("hidden");
     logMsg(`${players[playerIdx].name} landed exactly on the finish and won!`);
     if(gameListenerRef){ gameListenerRef.off("value", onGameSnapshot); gameListenerRef = null; }
+    recordGameResult(playerIdx);
   }
 
   document.getElementById("playAgainBtn").addEventListener("click", () => {
