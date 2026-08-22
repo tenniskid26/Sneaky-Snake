@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   :root{
     --paper: #F4EEDC;
@@ -425,7 +424,7 @@
     <h3>🌐 Online mode</h3>
     <p>Each player joins from their own device with a room code. Only the current player's device is interactive — everyone else just watches until it's their turn.</p>
     <h3>👤 Accounts</h3>
-    <p>Logging in is optional — it keeps your game stats associated with your account so they can be used across devices.</p>
+    <p>Logging in is optional — it just remembers your username on this device and keeps a tally of how many games you've played and when.</p>
     <h3>🔊 Sound</h3>
     <p>Tap the speaker icon during a game to mute or unmute the music and sound effects.</p>
     <h3>🏠 Quitting</h3>
@@ -461,7 +460,7 @@
     <div class="error-text" id="authError"></div>
     <button class="big-btn" id="authSubmitBtn">Log In</button>
     <button class="big-btn secondary" id="authCancelBtn">Cancel</button>
-    <div class="notice-text" style="margin-top:10px; font-size:0.85rem;">This is a simple account for tracking your game stats. Your password is securely handled by Firebase and is not stored in the game database.</div>
+    <div class="notice-text" style="margin-top:10px; font-size:0.85rem;">This is a simple account for tracking your game stats on this device/browser — use a password you don't use anywhere important.</div>
   </div>
 </div>
 
@@ -641,14 +640,13 @@
     messagingSenderId: "559512802737",
     appId: "1:559512802737:web:4abc1afa8e9a7d5a515990"
   };
-  let fbApp = null, fbDb = null, fbAuth = null, fbOk = false, fbInitError = null;
+  let fbApp = null, fbDb = null, fbOk = false, fbInitError = null;
   try{
     if(typeof firebase === "undefined"){
       throw new Error("Firebase SDK scripts did not load (blocked by an ad blocker/extension, a firewall, or a network filter).");
     }
     fbApp = firebase.initializeApp(firebaseConfig);
     fbDb = firebase.database();
-    fbAuth = firebase.auth();
     fbOk = true;
   } catch(e){
     fbOk = false;
@@ -659,18 +657,47 @@
   function storageOk(){ return fbOk; }
 
   // ================= ACCOUNTS (optional login) =================
-  // Accounts use Firebase Authentication for the password/session instead
-  // of storing password hashes in Realtime Database. The player still sees
-  // only a username + password; Firebase uses a private synthetic email
-  // address behind the scenes. No real email address is collected.
-  let currentUser = null; // { key, username, uid }
+  // Accounts are intentionally local to this browser/device. They are only
+  // used to remember the username and game statistics. Firebase is NOT used
+  // for account creation/login, so account access cannot be blocked by
+  // Realtime Database security rules. Online multiplayer still uses Firebase.
+  let currentUser = null; // { key, username }
 
-  function usersRef(key){ return fbDb.ref("users/" + key); }
-  function usernameToKey(name){ return name.trim().toLowerCase(); }
-  function authEmailForUsername(key){ return key + "@accounts.sneakysnake.app"; }
+  const LOCAL_ACCOUNT_STORE = "sneakySnakeAccounts";
+  const LOCAL_USER_KEY = "sneakySnakeUser";
 
-  function validUsername(name){
-    return /^[A-Za-z0-9_]{3,16}$/.test(name.trim());
+  function cryptoOk(){ return !!(window.crypto && window.crypto.subtle); }
+  function usernameToKey(name){ return name.trim().toLowerCase().replace(/[^a-z0-9_]/g, ""); }
+
+  async function sha256Hex(text){
+    const enc = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest("SHA-256", enc);
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+
+  function randomSalt(){
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    return [...arr].map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+
+  function loadLocalAccounts(){
+    try{
+      const raw = localStorage.getItem(LOCAL_ACCOUNT_STORE);
+      if(!raw) return {};
+      const data = JSON.parse(raw);
+      return data && typeof data === "object" ? data : {};
+    } catch(e){
+      return {};
+    }
+  }
+
+  function saveLocalAccounts(accounts){
+    localStorage.setItem(LOCAL_ACCOUNT_STORE, JSON.stringify(accounts));
+  }
+
+  function getLocalAccount(key){
+    return loadLocalAccounts()[key] || null;
   }
 
   function updateAccountBar(){
@@ -688,54 +715,35 @@
 
   function rememberUser(user){
     currentUser = user;
-    try{ localStorage.setItem("sneakySnakeUser", JSON.stringify({ key:user.key, username:user.username })); } catch(e){ /* ignore */ }
+    try{ localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(user)); } catch(e){ /* ignore */ }
     updateAccountBar();
   }
-  async function forgetUser(){
+
+  function forgetUser(){
     currentUser = null;
-    try{ localStorage.removeItem("sneakySnakeUser"); } catch(e){ /* ignore */ }
-    if(fbAuth){
-      try{ await fbAuth.signOut(); } catch(e){ /* ignore */ }
-    }
+    try{ localStorage.removeItem(LOCAL_USER_KEY); } catch(e){ /* ignore */ }
     updateAccountBar();
   }
 
-  // Firebase Authentication is the source of truth for the session.
-  // localStorage only remembers which username was last used on this device.
-  if(fbAuth){
-    fbAuth.onAuthStateChanged(async (user) => {
-      if(!user){
-        currentUser = null;
+  (function loadRememberedUser(){
+    try{
+      const raw = localStorage.getItem(LOCAL_USER_KEY);
+      if(!raw) return;
+      const saved = JSON.parse(raw);
+      if(saved && saved.key && saved.username && getLocalAccount(saved.key)){
+        currentUser = saved;
         updateAccountBar();
-        return;
+      } else {
+        localStorage.removeItem(LOCAL_USER_KEY);
       }
-      try{
-        const saved = localStorage.getItem("sneakySnakeUser");
-        const parsed = saved ? JSON.parse(saved) : null;
-        const key = parsed && parsed.key ? parsed.key : null;
-        if(!key){ throw new Error("Missing remembered username"); }
-        const snap = await usersRef(key).get();
-        const data = snap.val();
-        if(!data || data.uid !== user.uid){
-          await fbAuth.signOut();
-          return;
-        }
-        currentUser = { key, username:data.username, uid:user.uid };
-        updateAccountBar();
-      } catch(e){
-        console.error("Sneaky Snake: couldn't restore account —", e);
-        try{ await fbAuth.signOut(); } catch(ignore){}
-      }
-    });
-  }
+    } catch(e){ /* ignore corrupt/unavailable storage */ }
+  })();
 
-  // Records a completed game's result (win/loss) for whoever is logged in
-  // on this device, once the game actually finishes. Scoped to Bot mode and
-  // Online mode only — in Local pass-and-play, several humans usually share
-  // one device, so there's no single reliable "you" to attribute a result
-  // to. gameMode is set by each of the three game-start flows.
+  // Records a completed game's result for whoever is logged in on this device.
+  // This is deliberately local because the account feature only exists to
+  // remember stats; it does not need a server-side account database.
   async function recordGameResult(winnerIdx){
-    if(!currentUser || !storageOk()) return;
+    if(!currentUser) return;
     let won;
     if(gameMode === "bot"){
       won = (winnerIdx === 0); // you're always seat 0 in Bot mode
@@ -743,19 +751,23 @@
       if(mySeatIndex < 0) return;
       won = (winnerIdx === mySeatIndex);
     } else {
-      return; // local pass-and-play — not tracked, see note above
+      return; // local pass-and-play — not tracked
     }
+
     try{
+      const accounts = loadLocalAccounts();
+      const account = accounts[currentUser.key];
+      if(!account) return;
       const nowIso = new Date().toISOString();
-      await usersRef(currentUser.key).transaction(data => {
-        if(!data) return data; // account vanished server-side — don't recreate here
-        data.gamesPlayed = (data.gamesPlayed || 0) + 1;
-        data.history = data.history || [];
-        data.history.push({ ts: nowIso, result: won ? "win" : "loss" });
-        if(data.history.length > 20) data.history = data.history.slice(-20);
-        return data;
-      });
-    } catch(e){ console.error("Sneaky Snake: couldn't record game result —", e); }
+      account.gamesPlayed = (account.gamesPlayed || 0) + 1;
+      account.history = account.history || [];
+      account.history.push({ ts: nowIso, result: won ? "win" : "loss" });
+      if(account.history.length > 20) account.history = account.history.slice(-20);
+      accounts[currentUser.key] = account;
+      saveLocalAccounts(accounts);
+    } catch(e){
+      console.error("Sneaky Snake: couldn't record game result —", e);
+    }
   }
 
   // ---- Auth overlay ----
@@ -786,82 +798,49 @@
 
   document.getElementById("authSubmitBtn").addEventListener("click", async () => {
     authError.textContent = "";
-    if(!storageOk() || !fbAuth){ authError.textContent = "Accounts aren't available right now."; return; }
+    if(!cryptoOk()){
+      authError.textContent = "Accounts need a secure (https) connection to work in this browser.";
+      return;
+    }
 
-    const rawName = document.getElementById("authUsernameInput").value.trim();
+    const rawName = document.getElementById("authUsernameInput").value;
     const password = document.getElementById("authPasswordInput").value;
-    if(!validUsername(rawName)){
-      authError.textContent = "Username must be 3–16 letters, numbers, or underscores.";
-      return;
-    }
-    if(password.length < 6){
-      authError.textContent = "Password must be at least 6 characters.";
-      return;
-    }
-
     const key = usernameToKey(rawName);
-    const email = authEmailForUsername(key);
-    const submitBtn = document.getElementById("authSubmitBtn");
-    submitBtn.disabled = true;
+    if(key.length < 3){ authError.textContent = "Username needs at least 3 letters/numbers."; return; }
+    if(password.length < 4){ authError.textContent = "Password needs at least 4 characters."; return; }
 
     try{
+      const accounts = loadLocalAccounts();
+
       if(authMode === "signup"){
         const confirmPass = document.getElementById("authConfirmInput").value;
-        if(password !== confirmPass){
-          authError.textContent = "Passwords don't match.";
-          return;
-        }
+        if(password !== confirmPass){ authError.textContent = "Passwords don't match."; return; }
+        if(accounts[key]){ authError.textContent = "That username is already taken."; return; }
 
-        // Reserve the username in Realtime Database first. The rules allow
-        // the creator to write this record only after Firebase Auth exists,
-        // so we create the Auth account and immediately claim the username.
-        const cred = await fbAuth.createUserWithEmailAndPassword(email, password);
-        let taken = false;
-        try{
-          const result = await usersRef(key).transaction(existing => {
-            if(existing){ taken = true; return; }
-            return {
-              username: rawName,
-              uid: cred.user.uid,
-              gamesPlayed: 0,
-              history: [],
-              createdAt: new Date().toISOString()
-            };
-          });
-          if(taken || !result.committed){
-            await cred.user.delete();
-            authError.textContent = "That username is already taken.";
-            return;
-          }
-        } catch(e){
-          try{ await cred.user.delete(); } catch(ignore){}
-          throw e;
-        }
-
+        const salt = randomSalt();
+        const passHash = await sha256Hex(salt + password);
+        accounts[key] = {
+          username: rawName.trim(),
+          salt,
+          passHash,
+          gamesPlayed: 0,
+          history: [],
+          createdAt: new Date().toISOString()
+        };
+        saveLocalAccounts(accounts);
         authOverlay.classList.add("hidden");
-        rememberUser({ key, username:rawName, uid:cred.user.uid });
+        rememberUser({ key, username: rawName.trim() });
       } else {
-        const cred = await fbAuth.signInWithEmailAndPassword(email, password);
-        const snap = await usersRef(key).get();
-        const data = snap.val();
-        if(!data || data.uid !== cred.user.uid){
-          await fbAuth.signOut();
-          authError.textContent = "No account with that username.";
-          return;
-        }
+        const account = accounts[key];
+        if(!account){ authError.textContent = "No account with that username on this device."; return; }
+        const hash = await sha256Hex(account.salt + password);
+        if(hash !== account.passHash){ authError.textContent = "Incorrect password."; return; }
         authOverlay.classList.add("hidden");
-        rememberUser({ key, username:data.username, uid:cred.user.uid });
+        rememberUser({ key, username: account.username });
       }
     } catch(e){
-      console.error("Sneaky Snake: auth failed —", e);
-      if(e && e.code === "auth/email-already-in-use") authError.textContent = "That username is already taken.";
-      else if(e && e.code === "auth/wrong-password") authError.textContent = "Incorrect password.";
-      else if(e && e.code === "auth/user-not-found") authError.textContent = "No account with that username.";
-      else if(e && e.code === "auth/invalid-credential") authError.textContent = "Incorrect username or password.";
-      else if(e && e.code === "auth/weak-password") authError.textContent = "Password must be at least 6 characters.";
-      else authError.textContent = "Couldn't log in. Try again.";
-    } finally {
-      submitBtn.disabled = false;
+      console.error("Sneaky Snake: account action failed —", e);
+      authError.textContent = "Couldn't save the account. Try again.";
     }
   });
 
@@ -873,10 +852,9 @@
     document.getElementById("statsGamesPlayed").textContent = "Loading...";
     document.getElementById("statsHistoryList").innerHTML = "";
     statsOverlay.classList.remove("hidden");
-    if(!storageOk()){ document.getElementById("statsGamesPlayed").textContent = "Online storage isn't available right now."; return; }
+
     try{
-      const snap = await usersRef(currentUser.key).get();
-      const data = snap.val() || {};
+      const data = getLocalAccount(currentUser.key) || {};
       document.getElementById("statsGamesPlayed").textContent = `${data.gamesPlayed || 0} games played`;
       const list = document.getElementById("statsHistoryList");
       const history = (data.history || []).slice().reverse();
@@ -884,8 +862,7 @@
         list.innerHTML = `<div class="stats-history-item">No games yet — go play one!</div>`;
       } else {
         history.forEach(entry => {
-          // Older entries (from before win/loss tracking) are plain ISO
-          // strings; newer ones are {ts, result} objects — handle both.
+          // Older entries are plain ISO strings; newer ones are objects.
           const iso = typeof entry === "string" ? entry : entry.ts;
           const result = typeof entry === "string" ? null : entry.result;
           const row = document.createElement("div");
