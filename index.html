@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   :root{
     --paper: #F4EEDC;
@@ -424,7 +425,7 @@
     <h3>🌐 Online mode</h3>
     <p>Each player joins from their own device with a room code. Only the current player's device is interactive — everyone else just watches until it's their turn.</p>
     <h3>👤 Accounts</h3>
-    <p>Logging in is optional — it just remembers your username on this device and keeps a tally of how many games you've played and when.</p>
+    <p>Logging in is optional — it keeps your game stats associated with your account so they can be used across devices.</p>
     <h3>🔊 Sound</h3>
     <p>Tap the speaker icon during a game to mute or unmute the music and sound effects.</p>
     <h3>🏠 Quitting</h3>
@@ -460,7 +461,7 @@
     <div class="error-text" id="authError"></div>
     <button class="big-btn" id="authSubmitBtn">Log In</button>
     <button class="big-btn secondary" id="authCancelBtn">Cancel</button>
-    <div class="notice-text" style="margin-top:10px; font-size:0.85rem;">This is a simple account just for tracking your game stats on this site — use a password you don't use anywhere important.</div>
+    <div class="notice-text" style="margin-top:10px; font-size:0.85rem;">This is a simple account for tracking your game stats. Your password is securely handled by Firebase and is not stored in the game database.</div>
   </div>
 </div>
 
@@ -640,13 +641,14 @@
     messagingSenderId: "559512802737",
     appId: "1:559512802737:web:4abc1afa8e9a7d5a515990"
   };
-  let fbApp = null, fbDb = null, fbOk = false, fbInitError = null;
+  let fbApp = null, fbDb = null, fbAuth = null, fbOk = false, fbInitError = null;
   try{
     if(typeof firebase === "undefined"){
       throw new Error("Firebase SDK scripts did not load (blocked by an ad blocker/extension, a firewall, or a network filter).");
     }
     fbApp = firebase.initializeApp(firebaseConfig);
     fbDb = firebase.database();
+    fbAuth = firebase.auth();
     fbOk = true;
   } catch(e){
     fbOk = false;
@@ -657,27 +659,18 @@
   function storageOk(){ return fbOk; }
 
   // ================= ACCOUNTS (optional login) =================
-  // A lightweight, low-stakes account system just for remembering a
-  // username and tallying games played on this device/site. This is not
-  // bank-grade security — passwords are salted + SHA-256 hashed before
-  // ever being written anywhere, but there's no server-side session
-  // token, just a locally-remembered login. Fine for a casual game,
-  // not for anything sensitive (hence the note on the login screen).
-  let currentUser = null; // { key, username }
+  // Accounts use Firebase Authentication for the password/session instead
+  // of storing password hashes in Realtime Database. The player still sees
+  // only a username + password; Firebase uses a private synthetic email
+  // address behind the scenes. No real email address is collected.
+  let currentUser = null; // { key, username, uid }
 
-  function cryptoOk(){ return !!(window.crypto && window.crypto.subtle); }
   function usersRef(key){ return fbDb.ref("users/" + key); }
-  function usernameToKey(name){ return name.trim().toLowerCase().replace(/[^a-z0-9_]/g, ""); }
+  function usernameToKey(name){ return name.trim().toLowerCase(); }
+  function authEmailForUsername(key){ return key + "@accounts.sneakysnake.app"; }
 
-  async function sha256Hex(text){
-    const enc = new TextEncoder().encode(text);
-    const buf = await crypto.subtle.digest("SHA-256", enc);
-    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
-  }
-  function randomSalt(){
-    const arr = new Uint8Array(16);
-    crypto.getRandomValues(arr);
-    return [...arr].map(b => b.toString(16).padStart(2,"0")).join("");
+  function validUsername(name){
+    return /^[A-Za-z0-9_]{3,16}$/.test(name.trim());
   }
 
   function updateAccountBar(){
@@ -695,22 +688,46 @@
 
   function rememberUser(user){
     currentUser = user;
-    try{ localStorage.setItem("sneakySnakeUser", JSON.stringify(user)); } catch(e){ /* ignore */ }
+    try{ localStorage.setItem("sneakySnakeUser", JSON.stringify({ key:user.key, username:user.username })); } catch(e){ /* ignore */ }
     updateAccountBar();
   }
-  function forgetUser(){
+  async function forgetUser(){
     currentUser = null;
     try{ localStorage.removeItem("sneakySnakeUser"); } catch(e){ /* ignore */ }
+    if(fbAuth){
+      try{ await fbAuth.signOut(); } catch(e){ /* ignore */ }
+    }
     updateAccountBar();
   }
-  (function loadRememberedUser(){
-    try{
-      const raw = localStorage.getItem("sneakySnakeUser");
-      if(!raw) return;
-      const saved = JSON.parse(raw);
-      if(saved && saved.key && saved.username){ currentUser = saved; updateAccountBar(); }
-    } catch(e){ /* ignore corrupt/unavailable storage */ }
-  })();
+
+  // Firebase Authentication is the source of truth for the session.
+  // localStorage only remembers which username was last used on this device.
+  if(fbAuth){
+    fbAuth.onAuthStateChanged(async (user) => {
+      if(!user){
+        currentUser = null;
+        updateAccountBar();
+        return;
+      }
+      try{
+        const saved = localStorage.getItem("sneakySnakeUser");
+        const parsed = saved ? JSON.parse(saved) : null;
+        const key = parsed && parsed.key ? parsed.key : null;
+        if(!key){ throw new Error("Missing remembered username"); }
+        const snap = await usersRef(key).get();
+        const data = snap.val();
+        if(!data || data.uid !== user.uid){
+          await fbAuth.signOut();
+          return;
+        }
+        currentUser = { key, username:data.username, uid:user.uid };
+        updateAccountBar();
+      } catch(e){
+        console.error("Sneaky Snake: couldn't restore account —", e);
+        try{ await fbAuth.signOut(); } catch(ignore){}
+      }
+    });
+  }
 
   // Records a completed game's result (win/loss) for whoever is logged in
   // on this device, once the game actually finishes. Scoped to Bot mode and
@@ -769,45 +786,82 @@
 
   document.getElementById("authSubmitBtn").addEventListener("click", async () => {
     authError.textContent = "";
-    if(!storageOk()){ authError.textContent = "Online storage isn't available right now."; return; }
-    if(!cryptoOk()){ authError.textContent = "Accounts need a secure (https) connection to work in this browser."; return; }
-    const rawName = document.getElementById("authUsernameInput").value;
-    const password = document.getElementById("authPasswordInput").value;
-    const key = usernameToKey(rawName);
-    if(key.length < 3){ authError.textContent = "Username needs at least 3 letters/numbers."; return; }
-    if(password.length < 4){ authError.textContent = "Password needs at least 4 characters."; return; }
+    if(!storageOk() || !fbAuth){ authError.textContent = "Accounts aren't available right now."; return; }
 
-    if(authMode === "signup"){
-      const confirmPass = document.getElementById("authConfirmInput").value;
-      if(password !== confirmPass){ authError.textContent = "Passwords don't match."; return; }
-      try{
-        const salt = randomSalt();
-        const passHash = await sha256Hex(salt + password);
+    const rawName = document.getElementById("authUsernameInput").value.trim();
+    const password = document.getElementById("authPasswordInput").value;
+    if(!validUsername(rawName)){
+      authError.textContent = "Username must be 3–16 letters, numbers, or underscores.";
+      return;
+    }
+    if(password.length < 6){
+      authError.textContent = "Password must be at least 6 characters.";
+      return;
+    }
+
+    const key = usernameToKey(rawName);
+    const email = authEmailForUsername(key);
+    const submitBtn = document.getElementById("authSubmitBtn");
+    submitBtn.disabled = true;
+
+    try{
+      if(authMode === "signup"){
+        const confirmPass = document.getElementById("authConfirmInput").value;
+        if(password !== confirmPass){
+          authError.textContent = "Passwords don't match.";
+          return;
+        }
+
+        // Reserve the username in Realtime Database first. The rules allow
+        // the creator to write this record only after Firebase Auth exists,
+        // so we create the Auth account and immediately claim the username.
+        const cred = await fbAuth.createUserWithEmailAndPassword(email, password);
         let taken = false;
-        const result = await usersRef(key).transaction(existing => {
-          if(existing){ taken = true; return; }
-          return { username: rawName.trim(), salt, passHash, gamesPlayed: 0, history: [], createdAt: new Date().toISOString() };
-        });
-        if(taken || !result.committed){ authError.textContent = "That username is already taken."; return; }
+        try{
+          const result = await usersRef(key).transaction(existing => {
+            if(existing){ taken = true; return; }
+            return {
+              username: rawName,
+              uid: cred.user.uid,
+              gamesPlayed: 0,
+              history: [],
+              createdAt: new Date().toISOString()
+            };
+          });
+          if(taken || !result.committed){
+            await cred.user.delete();
+            authError.textContent = "That username is already taken.";
+            return;
+          }
+        } catch(e){
+          try{ await cred.user.delete(); } catch(ignore){}
+          throw e;
+        }
+
         authOverlay.classList.add("hidden");
-        rememberUser({ key, username: rawName.trim() });
-      } catch(e){
-        console.error("Sneaky Snake: signup failed —", e);
-        authError.textContent = "Couldn't create account. Try again.";
-      }
-    } else {
-      try{
+        rememberUser({ key, username:rawName, uid:cred.user.uid });
+      } else {
+        const cred = await fbAuth.signInWithEmailAndPassword(email, password);
         const snap = await usersRef(key).get();
         const data = snap.val();
-        if(!data){ authError.textContent = "No account with that username."; return; }
-        const hash = await sha256Hex(data.salt + password);
-        if(hash !== data.passHash){ authError.textContent = "Incorrect password."; return; }
+        if(!data || data.uid !== cred.user.uid){
+          await fbAuth.signOut();
+          authError.textContent = "No account with that username.";
+          return;
+        }
         authOverlay.classList.add("hidden");
-        rememberUser({ key, username: data.username });
-      } catch(e){
-        console.error("Sneaky Snake: login failed —", e);
-        authError.textContent = "Couldn't log in. Try again.";
+        rememberUser({ key, username:data.username, uid:cred.user.uid });
       }
+    } catch(e){
+      console.error("Sneaky Snake: auth failed —", e);
+      if(e && e.code === "auth/email-already-in-use") authError.textContent = "That username is already taken.";
+      else if(e && e.code === "auth/wrong-password") authError.textContent = "Incorrect password.";
+      else if(e && e.code === "auth/user-not-found") authError.textContent = "No account with that username.";
+      else if(e && e.code === "auth/invalid-credential") authError.textContent = "Incorrect username or password.";
+      else if(e && e.code === "auth/weak-password") authError.textContent = "Password must be at least 6 characters.";
+      else authError.textContent = "Couldn't log in. Try again.";
+    } finally {
+      submitBtn.disabled = false;
     }
   });
 
