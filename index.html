@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sneaky Snake</title>
+<title>SlySnake</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -232,7 +232,7 @@
 </head>
 <body>
 <div class="app">
-  <h1 class="title">Sneaky <span>Snake</span></h1>
+  <h1 class="title">Sly<span>Snake</span></h1>
   <div class="subtitle" id="subtitleText">First to land exactly on the end wins!</div>
 
   <!-- ACCOUNT BAR -->
@@ -388,7 +388,7 @@
     <div class="log-panel" id="logPanel"></div>
   </div>
 
-  <footer class="credit">Sneaky Snake &mdash; a homemade game, digitized</footer>
+  <footer class="credit">SlySnake &mdash; a homemade game, digitized</footer>
 </div>
 
 <div class="overlay hidden" id="cardOverlay">
@@ -409,7 +409,7 @@
 
 <div class="overlay hidden" id="helpOverlay">
   <div class="modal help-modal">
-    <h3>How to play Sneaky Snake</h3>
+    <h3>How to play SlySnake</h3>
     <p>Tap "Roll the Die" to move that many squares along the snake. Every square is numbered so you can always see exactly where you are.</p>
     <h3>🩵 Light blue squares</h3>
     <p>Safe! Nothing happens — your turn ends.</p>
@@ -651,7 +651,7 @@
   } catch(e){
     fbOk = false;
     fbInitError = e;
-    console.error("Sneaky Snake: Firebase failed to initialize —", e);
+    console.error("SlySnake: Firebase failed to initialize —", e);
   }
 
   function storageOk(){ return fbOk; }
@@ -766,7 +766,7 @@
       accounts[currentUser.key] = account;
       saveLocalAccounts(accounts);
     } catch(e){
-      console.error("Sneaky Snake: couldn't record game result —", e);
+      console.error("SlySnake: couldn't record game result —", e);
     }
   }
 
@@ -839,7 +839,7 @@
         rememberUser({ key, username: account.username });
       }
     } catch(e){
-      console.error("Sneaky Snake: account action failed —", e);
+      console.error("SlySnake: account action failed —", e);
       authError.textContent = "Couldn't save the account. Try again.";
     }
   });
@@ -881,7 +881,7 @@
         });
       }
     } catch(e){
-      console.error("Sneaky Snake: couldn't load stats —", e);
+      console.error("SlySnake: couldn't load stats —", e);
       document.getElementById("statsGamesPlayed").textContent = "Couldn't load stats right now.";
     }
   });
@@ -1184,7 +1184,7 @@
       await roomRef(roomCode).set({ started:false, players:[], seq:1 });
       enterLobby();
     } catch(e){
-      console.error("Sneaky Snake: create room failed —", e);
+      console.error("SlySnake: create room failed —", e);
       connectError.textContent = "Couldn't create a room. Try again.";
     }
   });
@@ -1200,7 +1200,7 @@
       roomCode = code;
       enterLobby();
     } catch(e){
-      console.error("Sneaky Snake: join room failed —", e);
+      console.error("SlySnake: join room failed —", e);
       connectError.textContent = "Room not found.";
     }
   });
@@ -1276,7 +1276,7 @@
       mySeatIndex = assignedSeat;
       return { ok:true };
     } catch(e){
-      console.error("Sneaky Snake: join failed —", e);
+      console.error("SlySnake: join failed —", e);
       return { ok:false, reason:"error" };
     }
   }
